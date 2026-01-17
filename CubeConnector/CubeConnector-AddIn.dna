@@ -1,0 +1,28 @@
+<DnaLibrary Name="CubeConnector" RuntimeVersion="v4.0">
+	<ExternalLibrary Path="CubeConnector.dll" ExplicitExports="false" LoadFromBytes="true" Pack="true" />
+
+	<!-- Enable logging -->
+	<Property Name="LogDisplay" Value="True" />
+	<Property Name="DiagnosticLogging" Value="True" />
+
+	<!-- Reference description -->
+	<Reference Name="Microsoft.Office.Interop.Excel" />
+
+	<!-- Add Ribbon Button to Data Tab -->
+	<CustomUI>
+		<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">
+			<ribbon>
+				<tabs>
+					<tab idMso="TabData">
+						<group id="CubeConnectorGroup" label="CubeConnector" insertAfterMso="GroupRefreshAll">
+							<button id="RefreshCCButton" label="Refresh CubeConnector"
+									onAction="CubeConnector.CubeConnectorRibbon.OnRefreshClicked"
+									imageMso="DatabaseCube"
+									size="large" />
+						</group>
+					</tab>
+				</tabs>
+			</ribbon>
+		</customUI>
+	</CustomUI>
+</DnaLibrary>

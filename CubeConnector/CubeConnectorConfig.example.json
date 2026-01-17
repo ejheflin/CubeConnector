@@ -1,0 +1,58 @@
+{
+  "functions": [
+    {
+      "functionName": "CC.AmtNet",
+      "tenantId": "your-tenant-id-here",
+      "datasetPrefix": "sobe_wowvirtualserver-",
+      "datasetId": "cae9a534-453a-4513-b77d-cda5bfc91fd0",
+      "measureName": "[AmtNet]",
+      "parameters": [
+        {
+          "name": "accounts",
+          "position": 0,
+          "tableName": "Account",
+          "fieldName": "AccountID",
+          "dataType": "text",
+          "filterType": "List",
+          "isOptional": true
+        },
+        {
+          "name": "acctg_period_start",
+          "position": 1,
+          "tableName": "AcctgPeriod",
+          "fieldName": "Date",
+          "dataType": "date",
+          "filterType": "RangeStart",
+          "isOptional": true
+        },
+        {
+          "name": "acctg_period_end",
+          "position": 2,
+          "tableName": "AcctgPeriod",
+          "fieldName": "Date",
+          "dataType": "date",
+          "filterType": "RangeEnd",
+          "isOptional": true
+        },
+        {
+          "name": "cost_centers",
+          "position": 3,
+          "tableName": "CostCenter",
+          "fieldName": "CostCenterNumber",
+          "dataType": "text",
+          "filterType": "List",
+          "isOptional": true
+        },
+        {
+          "name": "afe",
+          "position": 4,
+          "tableName": "Afe",
+          "fieldName": "AfeNumber",
+          "dataType": "text",
+          "filterType": "List",
+          "isOptional": true
+        }
+      ]
+    }
+  ]
+}
