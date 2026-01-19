@@ -11,6 +11,7 @@ A fast, flexible Excel add-in built on Excel-DNA that creates dynamic Excel func
 ## Overview
 
 CubeConnector is a faster, easier, and more flexible alternative to Excel's built-in cube functions. Instead of manually writing complex formulas or relying on static pivot tables, you define custom Excel functions in a JSON configuration file that query Power BI measures directly. Each function can accept up to 15 user-defined parameters and supports model-defined drillthrough capabilities.
+![Cube Connector Demo](images/CCdemo_small.gif)
 
 ## Security and Authentication
 
