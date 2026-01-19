@@ -32,11 +32,6 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 
 ## Key Features
 
-### Dynamic Function Registration
-- Define custom Excel functions through JSON configuration
-- Automatically register functions on workbook open
-- No VBA or complex setup required
-
 ### Intelligent Caching
 - Query results are cached in a hidden worksheet table
 - Dramatically improves performance for repeated queries
@@ -45,21 +40,14 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 
 ### Drillthrough Capabilities
 - **Drill to Details**: Right-click any cell to see the underlying detail records
-- **Drill to Pivot**: Create instant pivot tables from query results
+- **Drill to Pivot**: Convert a query result into a filtered pivot table for further exploration
 - Context menu integration for seamless workflows
-
-### Power BI Integration
-- Works with Power BI Pro, Premium, and Fabric workspaces
-- Leverages "Analyze in Excel" connections for seamless authentication
-- Support for all DAX measure types
-- Automatic authentication using Azure AD
 
 ### Flexible Parameter System
 - Support for multiple filter types:
   - List filters (comma-separated values)
   - RangeStart or RangeEnd (start/end dates)
-  - Single value filters
-- Optional parameters with intelligent defaults
+- Optional parameters
 - Type-safe parameter handling (text, date, numeric)
 
 ### Excel Ribbon Integration
@@ -83,45 +71,6 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 - .NET Framework 4.7.2 or higher
 - Access to Power BI Pro, Premium, or Fabric workspace
 
-## Architecture
-
-```
-┌─────────────────┐
-│  Excel Workbook │
-│   (User Input)  │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  UDF Functions  │◄── JSON Configuration
-│ (CubeConnector) │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Cache Manager  │──► Hidden Cache Sheet
-│   (Optimizer)   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ DAX Query Build │
-│    (Dynamic)    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Power BI Conn.  │ (Analyze in Excel)
-│ (MS-Managed Auth)│
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Power BI Dataset│
-│   (Measures)    │
-└─────────────────┘
-```
-
 ## Getting Started
 
 ### Configuration
@@ -129,9 +78,9 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 1. Download the latest release from the [Releases](../../releases) page
 2. Extract the files to a local directory
 3. Edit the `CubeConnectorConfig.json` file in the same directory as the `.xll` file
-    - Paste in your tennantID
+    - Paste in your tenantID
     - Paste in your datasetID
-    - (optional) Define each param - these are used as filters for the function
+    - (optional) Define each param - these are used as filters for the function  
     - Note: if you already have an "analyze in excel" pivot, you can find your tenantID and datasetID by inspecting the connection:
 ![Finding Connection String IDs](images/connectionstring.png)
 
@@ -155,7 +104,7 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `functionName` | string | Name of the Excel function (e.g., "CC.AmtNet", "MyFunction") |
+| `functionName` | string | Name of the Excel function (e.g., "CC.SumSales", "MyFunction") |
 | `tenantId` | string | Azure AD tenant ID |
 | `datasetId` | string | Power BI dataset ID - can be full ID or just the GUID if using datasetPrefix |
 | `measureName` | string | DAX measure name (e.g., "[Revenue]") |
@@ -250,10 +199,6 @@ Where:
 
 **Tenant ID:**
 - Azure Portal → Azure Active Directory → Properties → Tenant ID
-
-**Workspace ID:**
-- Open Power BI workspace in browser
-- Copy the GUID from the URL: `https://app.powerbi.com/groups/{workspace-id}/...`
 
 **Dataset ID:**
 - Open dataset settings in Power BI
@@ -384,17 +329,6 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 ## Security
 
 For security concerns or vulnerability reports, please see [SECURITY.md](SECURITY.md).
-
-## Roadmap
-
-- [ ] Support for Python/R script execution
-- [ ] Multi-dataset queries
-- [ ] Enhanced error messaging and diagnostics
-- [ ] Query performance profiling
-- [ ] Export cache to CSV/JSON
-- [ ] Support for Power BI paginated reports
-- [ ] Parameter validation and IntelliSense
-- [ ] Async query execution for large datasets
 
 ## Changelog
 
