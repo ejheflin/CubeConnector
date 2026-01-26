@@ -51,6 +51,22 @@ namespace CubeConnector
             RefreshInternal(null, null);
         }
 
+        public void ClearCacheAndRefresh()
+        {
+            // Step 1: Delete the cache to force all cells to refresh
+            DeleteCacheWorksheet();
+
+            // Step 2: Recreate the cache (empty) so we can store results later
+            DynamicFunctionRegistration.EnsureCacheExists();
+
+            // Step 3: Trigger recalc so all UDF cells show #REFRESH
+            var app = (Microsoft.Office.Interop.Excel.Application)ExcelDna.Integration.ExcelDnaUtil.Application;
+            app.CalculateFullRebuild();
+
+            // Step 4: Call normal refresh to refill the cache
+            RefreshInternal(null, null);
+        }
+
         public void RefreshSheet(Excel.Worksheet sheet)
         {
             if (sheet == null)
@@ -126,7 +142,7 @@ namespace CubeConnector
                 //MessageBox.Show($"Built {queryBatches.Count} pooled DAX queries.\n\n" +
                 //    $"Query lengths:\n{string.Join("\n", queryBatches.Select((q, i) => $"Query {i + 1}: {q.DaxQuery.Length:N0} chars, {q.Pools.Count} pools"))}");
 
-                // Step 4: Copy first query to clipboard for testing
+                // Step 4: Copy first query to clipboard for testing (commented out)
                 //if (queryBatches.Count > 0)
                 //{
                 //    string firstQuery = queryBatches[0].DaxQuery;
@@ -409,6 +425,24 @@ namespace CubeConnector
             }
 
             return $"={item.Config.FunctionName}({string.Join(",", formattedParams)})";
+        }
+
+        /// <summary>
+        /// Delete the cache worksheet to force all cells to refresh
+        /// </summary>
+        private void DeleteCacheWorksheet()
+        {
+            try
+            {
+                Excel.Worksheet cacheSheet = workbook.Worksheets["__CubeConnector_Cache__"];
+                xlApp.DisplayAlerts = false;
+                cacheSheet.Delete();
+                xlApp.DisplayAlerts = true;
+            }
+            catch
+            {
+                // Cache worksheet doesn't exist, that's fine
+            }
         }
 
         /// <summary>

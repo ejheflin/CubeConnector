@@ -33,12 +33,6 @@ namespace CubeConnector
     /// 
     public class DynamicFunctionRegistration : IExcelAddIn
     {
-        [ExcelFunction(Name = "CC.Test", Description = "Test function", Category = "CubeConnector")]
-        public static string TestFunction()
-        {
-            return "Test works!";
-        }
-
         // Remove static constructor entirely!
 
         public void AutoOpen()  // NOT static anymore
@@ -367,29 +361,6 @@ namespace CubeConnector
 
                 //System.Windows.Forms.MessageBox.Show(
                 //    "Cache refreshed successfully!",
-                //    "CubeConnector",
-                //    System.Windows.Forms.MessageBoxButtons.OK,
-                //    System.Windows.Forms.MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                System.Windows.Forms.MessageBox.Show(
-                    $"Error refreshing cache:\n\n{ex.Message}",
-                    "CubeConnector Error",
-                    System.Windows.Forms.MessageBoxButtons.OK,
-                    System.Windows.Forms.MessageBoxIcon.Error);
-            }
-        }
-        public static void OnRefreshClicked(ExcelDna.Integration.CustomUI.IRibbonControl control)
-        {
-            try
-            {
-                var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
-                var workbook = app.ActiveWorkbook;
-                var manager = new RefreshManager(app, workbook);
-                manager.RefreshAll();
-                //System.Windows.Forms.MessageBox.Show(
-                //    "CubeConnector cache refreshed successfully!",
                 //    "CubeConnector",
                 //    System.Windows.Forms.MessageBoxButtons.OK,
                 //    System.Windows.Forms.MessageBoxIcon.Information);

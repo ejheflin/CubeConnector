@@ -44,10 +44,10 @@ namespace CubeConnector
                                 onAction='OnRefreshClicked'
                                 image='CubeIcon' />
                         <menu id='RefreshCCMenu'>
-                            <button id='RefreshCacheBtn' 
-                                    label='Refresh Cache' 
-                                    onAction='OnRefreshCacheClicked'
-                                    imageMso='RefreshAll' />
+                            <button id='ClearCacheBtn'
+                                    label='Clear Cache'
+                                    onAction='OnClearCacheClicked'
+                                    imageMso='RecordsDeleteRecord' />
                             <button id='DrillToDetailsBtn' 
                                     label='Drill to Details' 
                                     onAction='OnDrillToDetailsClicked'
@@ -109,13 +109,27 @@ namespace CubeConnector
             }
         }
 
-        public void OnRefreshCacheClicked(IRibbonControl control)
+        public void OnClearCacheClicked(IRibbonControl control)
         {
-            // Ensure prerequisites exist
-            EnsureConnectionExists();
-            EnsureCacheExists();
-            // Same as main button
-            OnRefreshClicked(control);
+            try
+            {
+                // Ensure prerequisites exist
+                EnsureConnectionExists();
+                EnsureCacheExists();
+
+                var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
+                var workbook = app.ActiveWorkbook;
+                var manager = new RefreshManager(app, workbook);
+                manager.ClearCacheAndRefresh();
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    $"Error clearing cache:\n\n{ex.Message}",
+                    "CubeConnector Error",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Error);
+            }
         }
 
         public void OnDrillToDetailsClicked(IRibbonControl control)
