@@ -78,11 +78,27 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 
 1. Download the latest release from the [Releases](../../releases) page
 2. Extract the files to a local directory
-3. Edit the `CubeConnectorConfig.json` file in the same directory as the `.xll` file
-    - Paste in your tenantID
-    - Paste in your datasetID
-    - (optional) Define each param - these are used as filters for the function  
-    - Note: if you already have an "analyze in excel" pivot, you can find your tenantID and datasetID by inspecting the connection:
+3. Configure your `CubeConnectorConfig.json` file using one of these methods:
+
+#### Option 1: Visual Config Wizard (Recommended)
+
+Use the [CubeConnector Config Wizard](https://ejheflin.github.io/CubeConnector/) for an intuitive visual configuration experience:
+
+1. Open the wizard in Chrome or Edge (requires File System Access API)
+2. Click "Open Config" and select your `CubeConnectorConfig.json` file
+3. Enter your Tenant ID once in the sidebar
+4. Add functions and configure their dataset IDs, measure names, and parameters
+5. Click "Save Config" to write changes back to your file
+
+**Note:** The config wizard is optional - advanced users can edit the JSON directly (see Option 2).
+
+#### Option 2: Manual JSON Edit
+
+Edit the `CubeConnectorConfig.json` file directly in the same directory as the `.xll` file:
+- Paste in your tenantID
+- Paste in your datasetID
+- (optional) Define each param - these are used as filters for the function
+- Note: if you already have an "analyze in excel" pivot, you can find your tenantID and datasetID by inspecting the connection:
 ![Finding Connection String IDs](images/connectionstring.png)
 
 ### Basic Structure
