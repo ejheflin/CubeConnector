@@ -192,162 +192,73 @@ namespace CubeConnector
             int varyingIndex = pool.VaryingParamIndex;
             var varyingParam = config.Parameters[varyingIndex];
 
-            string table = varyingParam.TableName;
-            string field = varyingParam.FieldName;
-            string fullField = $"{table}[{field}]";
+            // Build individual ROW statements for each varying value
+            // This ensures we use the user's exact input values in cache keys (like orphan queries)
+            var rowStatements = new List<string>();
 
-            // Build IN clause with varying values
-            var formattedValues = pool.VaryingValues
-                .Select(v => FormatValueCompact(v, varyingParam.DataType))
-                .ToList();
-            string inClause = string.Join(",", formattedValues);
-
-            // Build cache key expression
-            string cacheKeyExpr = BuildCacheKeyExpression(pool);
-
-            // Build CALCULATE expression with fixed filters
-            string calculateExpr = BuildCalculateExpression(pool);
-
-            // Use SELECTCOLUMNS to return only CacheKey and Result (not the source column)
-            string poolDax = $"SELECTCOLUMNS(FILTER(VALUES({fullField}),{fullField} IN {{{inClause}}})," +
-                           $"\"CacheKey\",{cacheKeyExpr},\"Result\",{calculateExpr})";
-
-            return poolDax;
-        }
-
-        /// <summary>
-        /// Build cache key expression that concatenates function name and all params
-        /// </summary>
-        private static string BuildCacheKeyExpression(QueryPool pool)
-        {
-            var config = pool.Config;
-            int varyingIndex = pool.VaryingParamIndex;
-            var parts = new List<string>();
-
-            // Function name
-            parts.Add($"\"{config.FunctionName}|\"");
-
-            // Build list of parameters to include (skip trailing empty ones)
-            int lastNonEmptyIndex = -1;
-            for (int i = config.Parameters.Count - 1; i >= 0; i--)
+            foreach (var varyingValue in pool.VaryingValues)
             {
-                if (i == varyingIndex)
+                // Build the complete parameter array for this specific item
+                var parameters = new string[config.Parameters.Count];
+                for (int i = 0; i < config.Parameters.Count; i++)
                 {
-                    lastNonEmptyIndex = i;
-                    break;
-                }
-                else
-                {
-                    string fixedValue = pool.FixedParameters[i];
-                    if (!string.IsNullOrEmpty(fixedValue))
+                    if (i == varyingIndex)
                     {
-                        lastNonEmptyIndex = i;
-                        break;
+                        parameters[i] = varyingValue;
+                    }
+                    else if (pool.FixedParameters.ContainsKey(i))
+                    {
+                        parameters[i] = pool.FixedParameters[i];
+                    }
+                    else
+                    {
+                        parameters[i] = "";
                     }
                 }
-            }
 
-            // Each parameter (only up to last non-empty)
-            for (int i = 0; i <= lastNonEmptyIndex; i++)
-            {
-                if (i == varyingIndex)
+                // Build cache key from user's exact parameters (same as orphan queries)
+                string cacheKey = CacheKey.BuildFromStrings(config.FunctionName, parameters);
+                string escapedKey = cacheKey.Replace("\"", "\"\"");
+
+                // Build filters for this specific set of parameters
+                var filters = new List<string>();
+                for (int i = 0; i < parameters.Length; i++)
                 {
-                    // Varying parameter - reference the column
+                    if (string.IsNullOrWhiteSpace(parameters[i])) continue;
+
                     var paramConfig = config.Parameters[i];
-                    string columnRef = $"{paramConfig.TableName}[{paramConfig.FieldName}]";
-
-                    // Convert to text based on data type
-                    string textExpr = ConvertToText(columnRef, paramConfig.DataType);
-                    parts.Add(textExpr);
+                    string filter = BuildFilterCompact(paramConfig, parameters[i]);
+                    if (!string.IsNullOrEmpty(filter))
+                    {
+                        filters.Add(filter);
+                    }
                 }
-                else
+
+                // Build CALCULATE expression
+                string measureName = config.MeasureName.Trim();
+                while (measureName.StartsWith("[") && measureName.EndsWith("]"))
                 {
-                    // Fixed parameter - literal value
-                    string fixedValue = pool.FixedParameters[i];
-                    parts.Add($"\"{fixedValue}\"");
+                    measureName = measureName.Substring(1, measureName.Length - 2).Trim();
                 }
+                measureName = $"[{measureName}]";
 
-                // Add separator pipe after each parameter
-                parts.Add("\"|\"");
+                string calculateExpr = filters.Count > 0
+                    ? $"CALCULATE({measureName},{string.Join(",", filters)})"
+                    : measureName;
+
+                // Build ROW statement with literal cache key (like orphan queries)
+                string rowStmt = $"ROW(\"CacheKey\",\"{escapedKey}\",\"Result\",{calculateExpr})";
+                rowStatements.Add(rowStmt);
             }
 
-            // Join with & (no spaces)
-            // This creates: "FUNC|" & param0 & "|" & param1 & "|" & param2 & "|"
-            // Result: FUNC|value0|value1|value2|
-            return string.Join("&", parts);
-        }
-
-        /// <summary>
-        /// Convert a column reference to text for cache key building
-        /// </summary>
-        private static string ConvertToText(string columnRef, string dataType)
-        {
-            switch (dataType.ToLower())
+            // UNION all rows together
+            if (rowStatements.Count == 1)
             {
-                case "number":
-                case "integer":
-                    return $"FORMAT({columnRef},\"0\")";
-
-                case "date":
-                case "datetime":
-                    // For dates in cache key, always format as yyyy-MM-dd
-                    // Years will be converted to dates in the filter, but the cache key 
-                    // should contain the original value for matching
-                    return $"FORMAT({columnRef},\"yyyy-MM-dd\")";
-
-                case "text":
-                default:
-                    return columnRef;
-            }
-        }
-
-        /// <summary>
-        /// Build CALCULATE expression with all fixed filters
-        /// </summary>
-        private static string BuildCalculateExpression(QueryPool pool)
-        {
-            var config = pool.Config;
-            var filters = new List<string>();
-
-            // Build filters for each fixed parameter
-            foreach (var fixedParam in pool.FixedParameters)
-            {
-                int paramIndex = fixedParam.Key;
-                string paramValue = fixedParam.Value;
-
-                if (string.IsNullOrWhiteSpace(paramValue))
-                {
-                    continue; // Skip empty params
-                }
-
-                var paramConfig = config.Parameters[paramIndex];
-                string filter = BuildFilterCompact(paramConfig, paramValue);
-
-                if (!string.IsNullOrEmpty(filter))
-                {
-                    filters.Add(filter);
-                }
-            }
-
-            // Ensure measure name is in proper format (strip any extra brackets)
-            string measureName = config.MeasureName.Trim();
-            // Remove any surrounding brackets first
-            while (measureName.StartsWith("[") && measureName.EndsWith("]"))
-            {
-                measureName = measureName.Substring(1, measureName.Length - 2).Trim();
-            }
-            // Add back single brackets
-            measureName = $"[{measureName}]";
-
-            // Build CALCULATE
-            if (filters.Count > 0)
-            {
-                return $"CALCULATE({measureName},{string.Join(",", filters)})";
+                return rowStatements[0];
             }
             else
             {
-                // No filters - just return the measure reference
-                return measureName;
+                return $"UNION({string.Join(",", rowStatements)})";
             }
         }
 
@@ -446,8 +357,7 @@ namespace CubeConnector
 
                 case "date":
                 case "datetime":
-                    // Value comes as Excel date number string (e.g., "46022")
-                    // Convert to DATE(year,month,day) for DAX
+                    // Try parsing as Excel date number first (e.g., "46022")
                     if (double.TryParse(value, out double excelDateNumber))
                     {
                         try
@@ -457,13 +367,16 @@ namespace CubeConnector
                         }
                         catch
                         {
-                            // If OADate conversion fails, try parsing as date string
-                            if (DateTime.TryParse(value, out DateTime parsedDt))
-                            {
-                                return $"DATE({parsedDt.Year},{parsedDt.Month},{parsedDt.Day})";
-                            }
+                            // OADate conversion failed, fall through to string parsing
                         }
                     }
+
+                    // Try parsing as date string (e.g., "2024-01-15")
+                    if (DateTime.TryParse(value, out DateTime parsedDt))
+                    {
+                        return $"DATE({parsedDt.Year},{parsedDt.Month},{parsedDt.Day})";
+                    }
+
                     // Fallback: return as-is (shouldn't happen if config is correct)
                     return value;
 

@@ -657,7 +657,13 @@ namespace CubeConnector
                 }
             }
 
-            return value.ToString();
+            // Normalize text parameters to uppercase for case-insensitive matching
+            string result = value.ToString();
+            if (paramConfig != null && paramConfig.DataType == "text")
+            {
+                result = result.ToUpper();
+            }
+            return result;
         }
 
         private string[] ExtractParametersFromCell(Excel.Range cell, UDFConfig config)

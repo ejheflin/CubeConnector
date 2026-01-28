@@ -41,6 +41,8 @@ namespace CubeConnector
 
             var parts = new List<string> { functionName };
 
+            // Normalize all parameters
+            var normalizedParams = new List<string>();
             for (int i = 0; i < parameters.Length; i++)
             {
                 ParameterConfig paramConfig = null;
@@ -49,7 +51,24 @@ namespace CubeConnector
                     paramConfig = config.Parameters[i];
                 }
 
-                parts.Add(NormalizeParameter(parameters[i], paramConfig));
+                normalizedParams.Add(NormalizeParameter(parameters[i], paramConfig));
+            }
+
+            // Find the last non-empty parameter to match DAX query behavior (skip trailing empty params)
+            int lastNonEmptyIndex = -1;
+            for (int i = normalizedParams.Count - 1; i >= 0; i--)
+            {
+                if (!string.IsNullOrEmpty(normalizedParams[i]))
+                {
+                    lastNonEmptyIndex = i;
+                    break;
+                }
+            }
+
+            // Only include parameters up to the last non-empty one
+            for (int i = 0; i <= lastNonEmptyIndex; i++)
+            {
+                parts.Add(normalizedParams[i]);
             }
 
             return string.Join(DELIMITER, parts);
@@ -60,8 +79,47 @@ namespace CubeConnector
         /// </summary>
         public static string BuildFromStrings(string functionName, params string[] parameters)
         {
+            // Get the function config to understand parameter types for normalization
+            var config = ConfigurationStore.GetConfig(functionName);
+
             var parts = new List<string> { functionName };
-            parts.AddRange(parameters);
+
+            // Normalize all parameters
+            var normalizedParams = new List<string>();
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                string param = parameters[i] ?? "";
+
+                // Uppercase text parameters for case-insensitive matching
+                if (config?.Parameters != null && i < config.Parameters.Count)
+                {
+                    var paramConfig = config.Parameters[i];
+                    if (paramConfig.DataType.ToLower() == "text")
+                    {
+                        param = param.ToUpper();
+                    }
+                }
+
+                normalizedParams.Add(param);
+            }
+
+            // Find the last non-empty parameter to match DAX query behavior (skip trailing empty params)
+            int lastNonEmptyIndex = -1;
+            for (int i = normalizedParams.Count - 1; i >= 0; i--)
+            {
+                if (!string.IsNullOrEmpty(normalizedParams[i]))
+                {
+                    lastNonEmptyIndex = i;
+                    break;
+                }
+            }
+
+            // Only include parameters up to the last non-empty one
+            for (int i = 0; i <= lastNonEmptyIndex; i++)
+            {
+                parts.Add(normalizedParams[i]);
+            }
+
             return string.Join(DELIMITER, parts);
         }
 
@@ -79,12 +137,12 @@ namespace CubeConnector
             // Handle ranges (convert to comma-separated list)
             if (param is object[,] range)
             {
-                return NormalizeRange(range);
+                return NormalizeRange(range, paramConfig);
             }
 
             if (param is object[] array)
             {
-                return string.Join(",", array.Select(v => v?.ToString() ?? ""));
+                return NormalizeArray(array, paramConfig);
             }
 
             // Handle dates
@@ -135,13 +193,19 @@ namespace CubeConnector
                 }
             }
 
-            return param.ToString();
+            // Normalize text parameters to uppercase for case-insensitive matching
+            string result = param.ToString();
+            if (paramConfig != null && paramConfig.DataType.ToLower() == "text")
+            {
+                result = result.ToUpper();
+            }
+            return result;
         }
 
         /// <summary>
         /// Convert Excel range to normalized string
         /// </summary>
-        private static string NormalizeRange(object[,] range)
+        private static string NormalizeRange(object[,] range, ParameterConfig paramConfig)
         {
             var values = new List<string>();
 
@@ -152,10 +216,23 @@ namespace CubeConnector
                     var val = range[i, j];
                     if (val != null && !(val is ExcelEmpty) && !(val is ExcelMissing))
                     {
-                        values.Add(val.ToString());
+                        // Recursively normalize each value in the range
+                        values.Add(NormalizeParameter(val, paramConfig));
                     }
                 }
             }
+
+            return string.Join(",", values);
+        }
+
+        /// <summary>
+        /// Convert array to normalized string
+        /// </summary>
+        private static string NormalizeArray(object[] array, ParameterConfig paramConfig)
+        {
+            var values = array
+                .Where(v => v != null && !(v is ExcelEmpty) && !(v is ExcelMissing))
+                .Select(v => NormalizeParameter(v, paramConfig));
 
             return string.Join(",", values);
         }
