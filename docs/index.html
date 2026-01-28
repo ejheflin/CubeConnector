@@ -168,6 +168,29 @@
             transform: none;
         }
 
+        .info-banner {
+            max-width: 1600px;
+            margin: 1.5rem auto 0;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+            border-left: 4px solid #3b82f6;
+            border-radius: 8px;
+            color: #1e40af;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .info-banner a {
+            color: #2563eb;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .info-banner a:hover {
+            color: #1d4ed8;
+        }
+
         .main-container {
             max-width: 1600px;
             margin: 2rem auto;
@@ -880,6 +903,10 @@
         </div>
     </div>
 
+    <div class="info-banner">
+        ℹ️ This wizard is an optional method to help you generate a valid CubeConnectorConfig.json file. You can edit your JSON directly or even <a id="downloadWizardLink">download this wizard</a> and run it locally.
+    </div>
+
     <div class="main-container">
         <aside class="sidebar">
             <div class="global-settings">
@@ -1006,6 +1033,22 @@
             saveConfigBtn.addEventListener('click', saveConfigFile);
             addFunctionBtn.addEventListener('click', addNewFunction);
             globalTenantIdInput.addEventListener('input', handleGlobalTenantIdChange);
+            
+            // Download wizard link
+            document.getElementById('downloadWizardLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                const htmlContent = document.documentElement.outerHTML;
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'CubeConnectorConfigEditor.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('Config Editor downloaded!', 'success');
+            });
             
             // GUID help
             document.querySelector('.guid-help').addEventListener('click', () => {
