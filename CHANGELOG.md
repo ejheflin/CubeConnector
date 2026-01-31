@@ -22,9 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache refresh via ribbon button and context menu
 - Query pool analyzer for optimization
 - Comprehensive documentation and examples
+- **Support for UDFs in arithmetic expressions** (e.g., `=MyFunc(1)+50`, `=MyFunc(1)*2`)
+- **Support for multiple UDFs per cell** (e.g., `=MyFunc(1)+MyFunc(2)`) - each UDF cached separately
+- **Force Refresh option** when no cells need refreshing - clears and rebuilds entire cache
+- **Protection for drill features** - prevents drillthrough on cells with multiple UDFs
+- **Enhanced error detection** - refresh finds cells with #VALUE! in addition to #REFRESH
+- **COM Variant type conversion** for proper Excel marshaling and calculation support
 
 ### Changed
-- N/A (initial release)
+- UDF functions now use `IsMacroType=false` to enable arithmetic expression support
+- Cache manager uses static Excel Application reference instead of per-call access
+- Refresh manager detects and parses multiple UDF calls within a single formula
+- Error display: standalone UDFs show #REFRESH, UDFs in expressions show #VALUE! (both resolved on refresh)
 
 ### Deprecated
 - N/A (initial release)
@@ -33,7 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A (initial release)
 
 ### Fixed
-- N/A (initial release)
+- **Critical**: UDFs now work correctly in arithmetic expressions without #VALUE! errors
+- **Critical**: Multiple UDFs per cell are properly identified and cached during refresh
+- Type marshaling issues that prevented calculated results in Excel formulas
 
 ### Security
 - N/A (initial release)

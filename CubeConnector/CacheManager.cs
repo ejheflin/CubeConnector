@@ -40,7 +40,13 @@ namespace CubeConnector
         {
             try
             {
-                var xlApp = (Excel.Application)ExcelDnaUtil.Application;
+                // Use static Application reference instead of ExcelDnaUtil.Application
+                // This allows the function to work without IsMacroType=true
+                var xlApp = DynamicFunctionRegistration.ExcelApp;
+                if (xlApp == null)
+                {
+                    return "#ERROR: Excel Application not initialized";
+                }
                 var workbook = xlApp.ActiveWorkbook;
 
                 // Get cache sheet
@@ -87,7 +93,7 @@ namespace CubeConnector
                         {
                             // Found it! Return the result (column 2)
                             var result = dataRange.Cells[row, 2].Value2;
-                            return result ?? "#NULL";
+                            return ConvertVariantToPrimitive(result);
                         }
                     }
                 }
@@ -99,6 +105,76 @@ namespace CubeConnector
             {
                 return "#REFRESH";
             }
+        }
+
+        /// <summary>
+        /// Convert COM Variant from Excel cell to proper .NET primitive type
+        /// This ensures Excel can use the value in arithmetic expressions
+        /// </summary>
+        private static object ConvertVariantToPrimitive(object value)
+        {
+            // Handle null
+            if (value == null)
+            {
+                return "#NULL";
+            }
+
+            // If it's already a .NET primitive, return as-is (converted to double for numerics)
+            Type valueType = value.GetType();
+
+            // Check for .NET numeric primitives
+            if (valueType == typeof(double) ||
+                valueType == typeof(int) ||
+                valueType == typeof(long) ||
+                valueType == typeof(float) ||
+                valueType == typeof(decimal))
+            {
+                // Convert to double for Excel
+                return Convert.ToDouble(value);
+            }
+
+            if (valueType == typeof(string))
+            {
+                return value.ToString();
+            }
+
+            if (valueType == typeof(bool))
+            {
+                return (bool)value;
+            }
+
+            // Handle COM Variant types - explicitly convert to primitives
+            if (valueType.IsCOMObject || valueType.FullName.Contains("System.__ComObject"))
+            {
+                // Try numeric conversion first (most common for measure values)
+                try
+                {
+                    double numValue = Convert.ToDouble(value);
+                    return numValue;
+                }
+                catch
+                {
+                    // Not a number, fall through to string conversion
+                }
+            }
+
+            // Convert to string and check for special Excel error values
+            string strValue = value.ToString();
+
+            // Pass through Excel error values
+            if (strValue.StartsWith("#"))
+            {
+                return strValue;
+            }
+
+            // Try parsing as number
+            if (double.TryParse(strValue, out double parsedNum))
+            {
+                return parsedNum;
+            }
+
+            // Return as string
+            return strValue;
         }
 
         /// <summary>
@@ -207,13 +283,18 @@ namespace CubeConnector
         }
 
         /// <summary>
-        /// Clear all cache entries (UDF context - uses ExcelDna)
+        /// Clear all cache entries (UDF context - uses static Excel reference)
         /// </summary>
         public static void Clear()
         {
             try
             {
-                var xlApp = (Excel.Application)ExcelDnaUtil.Application;
+                var xlApp = DynamicFunctionRegistration.ExcelApp;
+                if (xlApp == null)
+                {
+                    System.Windows.Forms.MessageBox.Show("Excel Application not initialized");
+                    return;
+                }
                 var workbook = xlApp.ActiveWorkbook;
                 Clear(workbook);
             }

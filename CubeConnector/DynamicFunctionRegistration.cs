@@ -33,12 +33,16 @@ namespace CubeConnector
     /// 
     public class DynamicFunctionRegistration : IExcelAddIn
     {
-        // Remove static constructor entirely!
+        // Static reference to Excel Application for cache access
+        public static Microsoft.Office.Interop.Excel.Application ExcelApp { get; private set; }
 
         public void AutoOpen()  // NOT static anymore
         {
             try
             {
+                // Store Excel Application reference for cache access
+                ExcelApp = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
+
                 var configs = ConfigurationStore.GetAllConfigs();
                 if (configs == null || configs.Count == 0) return;
 
@@ -146,7 +150,7 @@ namespace CubeConnector
                     Name = config.FunctionName,
                     Description = $"Retrieves {config.MeasureName} from Power BI dataset",
                     Category = "CubeConnector",
-                    IsMacroType = true // Required to call Excel Application
+                    IsMacroType = false // Allow use in arithmetic expressions
                 };
 
                 // Create parameter attributes
@@ -313,6 +317,26 @@ namespace CubeConnector
                 var activeCell = app.ActiveCell;
                 var workbook = app.ActiveWorkbook;
 
+                // Check if cell contains multiple CubeConnector functions
+                if (activeCell.HasFormula)
+                {
+                    string formula = activeCell.Formula.ToString();
+                    var allFunctionNames = ConfigurationStore.GetAllConfigs().Select(c => c.FunctionName).ToList();
+                    int udfCount = CountUDFsInFormula(formula, allFunctionNames);
+
+                    if (udfCount > 1)
+                    {
+                        System.Windows.Forms.MessageBox.Show(
+                            $"The selected cell contains {udfCount} CubeConnector functions.\n\n" +
+                            "Drill to Details only supports cells with a single CubeConnector function.\n\n" +
+                            "Please select a cell with only one function and try again.",
+                            "Multiple Functions Detected",
+                            System.Windows.Forms.MessageBoxButtons.OK,
+                            System.Windows.Forms.MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+
                 var manager = new DrillthroughManager(app, workbook);
                 manager.ExecuteDrillthrough(activeCell);
             }
@@ -320,6 +344,30 @@ namespace CubeConnector
             {
                 System.Windows.Forms.MessageBox.Show($"Error: {ex.Message}", "Error");
             }
+        }
+
+        /// <summary>
+        /// Count how many CubeConnector UDFs appear in a formula
+        /// </summary>
+        private static int CountUDFsInFormula(string formula, List<string> functionNames)
+        {
+            int count = 0;
+            string upperFormula = formula.ToUpper();
+
+            foreach (var funcName in functionNames)
+            {
+                string searchPattern = funcName.ToUpper() + "(";
+                int index = 0;
+
+                // Count all occurrences of "FunctionName("
+                while ((index = upperFormula.IndexOf(searchPattern, index)) != -1)
+                {
+                    count++;
+                    index += searchPattern.Length;
+                }
+            }
+
+            return count;
         }
 
         public static void DrillToPivotHandler()
@@ -331,6 +379,26 @@ namespace CubeConnector
                 var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
                 var activeCell = app.ActiveCell;
                 var workbook = app.ActiveWorkbook;
+
+                // Check if cell contains multiple CubeConnector functions
+                if (activeCell.HasFormula)
+                {
+                    string formula = activeCell.Formula.ToString();
+                    var allFunctionNames = ConfigurationStore.GetAllConfigs().Select(c => c.FunctionName).ToList();
+                    int udfCount = CountUDFsInFormula(formula, allFunctionNames);
+
+                    if (udfCount > 1)
+                    {
+                        System.Windows.Forms.MessageBox.Show(
+                            $"The selected cell contains {udfCount} CubeConnector functions.\n\n" +
+                            "Drill to Pivot only supports cells with a single CubeConnector function.\n\n" +
+                            "Please select a cell with only one function and try again.",
+                            "Multiple Functions Detected",
+                            System.Windows.Forms.MessageBoxButtons.OK,
+                            System.Windows.Forms.MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
 
                 // Create manager instance and execute
                 var manager = new PivotManager(app, workbook);

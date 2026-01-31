@@ -10,7 +10,7 @@ A fast, flexible Excel add-in built on Excel-DNA that creates dynamic Excel func
 
 ## Overview
 
-CubeConnector is a faster, easier, and more flexible alternative to Excel's built-in cube functions. Instead of manually writing complex formulas or relying on static pivot tables, you define custom Excel functions in a JSON configuration file that query Power BI measures directly. Each function can accept up to 15 user-defined parameters and supports model-defined drillthrough capabilities.
+CubeConnector is a faster, easier, and more flexible alternative to Excel's built-in cube functions. Instead of manually writing complex formulas or relying on static pivot tables, you define custom Excel functions in a JSON configuration file that query Power BI measures directly. Each function can accept up to 15 user-defined parameters, works seamlessly in arithmetic expressions and formulas, and supports model-defined drillthrough capabilities.
 ![Cube Connector Demo](images/CCdemo_small.gif)
 
 ## Security and Authentication
@@ -33,16 +33,24 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 
 ## Key Features
 
+### Native Excel Integration
+- **Works in formulas and expressions**: Use UDFs anywhere - `=MyFunc(1)+50`, `=SUM(MyFunc(1), 100)`, etc.
+- **Multiple UDFs per cell**: Combine multiple functions like `=MyFunc(1)+MyFunc(2)`
+- **Formula autocomplete**: Functions appear in Excel's IntelliSense like built-in functions
+- **Type-safe results**: Proper numeric marshaling for calculations and aggregations
+
 ### Intelligent Caching
 - Query results are cached in a hidden worksheet table
 - Dramatically improves performance for repeated queries
-- Manual and automatic refresh options
+- Manual and automatic refresh options with Force Refresh capability
+- Smart detection of cells needing refresh (#REFRESH and #VALUE! errors)
 - Cache invalidation strategies for data accuracy
 
 ### Drillthrough Capabilities
 - **Drill to Details**: Right-click any cell to see the underlying detail records
 - **Drill to Pivot**: Convert a query result into a filtered pivot table for further exploration
 - Context menu integration for seamless workflows
+- Intelligent protection against ambiguous drill scenarios
 
 ### Flexible Parameter System
 - Support for multiple filter types:
@@ -54,7 +62,8 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 ### Excel Ribbon Integration
 - Custom "CubeConnector" group in the Data tab
 - Quick access to:
-  - Refresh cache
+  - Refresh cache (with Force Refresh option)
+  - Clear cache
   - Drill to details
   - Drill to pivot
 
@@ -185,17 +194,33 @@ Where:
 - `p2` = Param2 as defined in your json (e.g. Start date "1/1/2026")
 - `p3` = Param3 as defined in your json (e.g. End date "12/31/2026")
 
+**Functions work seamlessly in expressions:**
+```excel
+=CC.MyMeasure(p1, p2) + 50              // Arithmetic
+=CC.MyMeasure(p1, p2) * 1.1             // Calculations
+=SUM(CC.MyMeasure(p1, p2), 100)         // With Excel functions
+=CC.MyMeasure(p1, p2) + CC.MyMeasure(p3, p4)  // Multiple UDFs
+```
+
+**Note**: Functions initially display `#REFRESH` (standalone) or `#VALUE!` (in expressions) until cached. Click Refresh to populate the cache.
+
 ### Refreshing Data
 
 **Option 1: Ribbon Button**
 - Click the "Refresh" button in the CubeConnector group on the Data tab
+- If no cells need refreshing, you'll be prompted with a "Force Refresh" option to clear and rebuild the entire cache
 
 **Option 2: Context Menu**
 - Right-click any cell
 - Select "CubeConnector - Refresh Cache"
 
-**Option 3: Programmatic**
-- Functions automatically refresh when cache is cleared
+**Option 3: Clear Cache**
+- Use the "Clear Cache" ribbon button to delete the cache and force all formulas to refresh
+
+**Smart Refresh Detection:**
+- Automatically detects cells showing `#REFRESH`, `#VALUE!`, or other Excel errors
+- Supports multiple UDFs per cell (e.g., `=MyFunc(1)+MyFunc(2)`) - each UDF is cached separately
+- Skips cells with valid cached values for optimal performance
 
 ### Drillthrough
 
@@ -208,6 +233,8 @@ Where:
 1. Click on a cell with a CubeConnector function result
 2. Right-click → "CubeConnector - Drill to Pivot"
 3. A new sheet opens with an interactive pivot table
+
+**Important**: Drill features only support cells with a **single** CubeConnector function. If a cell contains multiple UDFs (e.g., `=MyFunc(1)+MyFunc(2)`), you'll receive a warning and drillthrough will be cancelled. For drillthrough on combined results, create separate cells for each function first.
 
 
 ## Advanced Topics
@@ -253,9 +280,11 @@ The cache is stored in a hidden worksheet named `__CubeConnector_Cache__` with a
 
 ### Troubleshooting
 
-**#REFRESH Error:**
-- Cache needs to be refreshed
-- Click "Refresh" in the data tab of the ribbon or context menu
+**#REFRESH or #VALUE! Displayed:**
+- **#REFRESH**: Appears when a standalone UDF (e.g., `=MyFunc(1,2)`) needs data from cache
+- **#VALUE!**: Appears when a UDF in an expression (e.g., `=MyFunc(1,2)+50`) needs data from cache
+- **Solution**: Click "Refresh" in the Data tab ribbon or right-click menu to populate the cache
+- **Note**: Both are normal and indicate the function is waiting for its first refresh
 
 **Authentication Errors:**
 - Verify tenant ID is correct

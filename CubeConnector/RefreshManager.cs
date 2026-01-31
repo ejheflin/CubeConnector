@@ -107,7 +107,22 @@ namespace CubeConnector
                     string scope = targetRange != null ? "in selection" :
                                    targetSheet != null ? $"on sheet '{targetSheet.Name}'" :
                                    "in workbook";
-                    MessageBox.Show($"No cells need refreshing {scope}. All formulas are up to date!");
+
+                    var result = MessageBox.Show(
+                        $"No cells need refreshing {scope}. All formulas are up to date!\n\n" +
+                        "Would you like to force a refresh by clearing the cache and recalculating all formulas?",
+                        "All Formulas Up to Date",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Information);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        // User chose to force refresh - clear cache and refresh all
+                        xlApp.Calculation = originalCalcMode; // Restore calc mode before calling ClearCacheAndRefresh
+                        ClearCacheAndRefresh();
+                        return;
+                    }
+
                     return;
                 }
 
@@ -493,10 +508,10 @@ namespace CubeConnector
                 for (int col = 1; col <= usedRange.Columns.Count; col++)
                 {
                     Excel.Range cell = usedRange.Cells[row, col];
-                    var item = CheckCellForRefresh(cell);
-                    if (item != null)
+                    var items = CheckCellForRefresh(cell);
+                    if (items != null && items.Count > 0)
                     {
-                        results.Add(item);
+                        results.AddRange(items);
                     }
                 }
             }
@@ -513,10 +528,10 @@ namespace CubeConnector
 
             foreach (Excel.Range cell in range.Cells)
             {
-                var item = CheckCellForRefresh(cell);
-                if (item != null)
+                var items = CheckCellForRefresh(cell);
+                if (items != null && items.Count > 0)
                 {
-                    results.Add(item);
+                    results.AddRange(items);
                 }
             }
 
@@ -524,43 +539,112 @@ namespace CubeConnector
         }
 
         /// <summary>
-        /// Check if a single cell needs refresh
+        /// Check if a single cell needs refresh and extract all UDF calls
+        /// Returns a list of RefreshItems (one per UDF in the formula)
         /// </summary>
-        private RefreshItem CheckCellForRefresh(Excel.Range cell)
+        private List<RefreshItem> CheckCellForRefresh(Excel.Range cell)
         {
+            var results = new List<RefreshItem>();
+
             if (!cell.HasFormula)
             {
-                return null;
+                return results;
             }
 
             string formula = cell.Formula.ToString();
 
-            // Extract the actual function name from the formula
-            string functionName = ExtractFunctionName(formula);
-            if (string.IsNullOrEmpty(functionName))
-            {
-                return null;
-            }
-
-            // Check if this function name matches one of our configured functions
+            // Get all configured function names
             var allFunctionNames = ConfigurationStore.GetAllConfigs().Select(c => c.FunctionName).ToList();
-            bool isOurFunction = allFunctionNames.Any(name => name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
 
-            if (!isOurFunction)
+            // Check if formula contains any of our UDFs
+            bool containsOurUDF = allFunctionNames.Any(name =>
+                formula.IndexOf(name + "(", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (!containsOurUDF)
             {
-                return null;
+                return results;
             }
 
-            var value = cell.Value2;
-            var text = cell.Text;
-            string displayValue = value?.ToString() ?? text?.ToString() ?? "";
-
-            if (displayValue.Contains("#REFRESH") || displayValue.Contains("#N/A"))
+            // Check what Excel is actually displaying to the user
+            string displayText = "";
+            try
             {
-                return ParseFormulaToRefreshItem(formula, cell);
+                displayText = cell.Text?.ToString() ?? "";
+            }
+            catch
+            {
+                // Fallback to Value2 if Text fails
+                try
+                {
+                    var value = cell.Value2;
+                    displayText = value?.ToString() ?? "";
+                }
+                catch { }
             }
 
-            return null;
+            // Detect cells needing refresh based on displayed text
+            // This includes: #REFRESH (standalone), #N/A, #VALUE! (in expressions), or any Excel error
+            if (displayText.Contains("#REFRESH") ||
+                displayText.Contains("#N/A") ||
+                displayText.Contains("#VALUE") ||
+                displayText.Contains("#NULL") ||
+                displayText.Contains("#NAME") ||
+                displayText.Contains("#NUM") ||
+                displayText.Contains("#REF") ||
+                displayText.Contains("#DIV/0"))
+            {
+                // Parse ALL UDF calls in the formula
+                results.AddRange(ParseFormulaForAllUDFs(formula, cell, allFunctionNames));
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Parse formula to extract ALL UDF calls (supports multiple UDFs per cell)
+        /// </summary>
+        private List<RefreshItem> ParseFormulaForAllUDFs(string formula, Excel.Range cell, List<string> allFunctionNames)
+        {
+            var results = new List<RefreshItem>();
+
+            try
+            {
+                // Find all UDF function calls in the formula
+                var functionCalls = ExtractAllUDFFunctionCalls(formula, allFunctionNames);
+
+                foreach (var funcCall in functionCalls)
+                {
+                    try
+                    {
+                        var config = ConfigurationStore.GetConfig(funcCall.FunctionName);
+                        if (config == null) continue;
+
+                        // Parse parameters from the extracted function call
+                        var parameters = ParseFunctionCallParameters(funcCall.FunctionCall, cell, config);
+                        string cacheKey = CacheKey.BuildFromStrings(funcCall.FunctionName, parameters);
+
+                        results.Add(new RefreshItem
+                        {
+                            CacheKey = cacheKey,
+                            Config = config,
+                            Parameters = parameters,
+                            FunctionSignature = $"={funcCall.FunctionCall}",
+                            Cell = cell
+                        });
+                    }
+                    catch
+                    {
+                        // Skip individual UDF if parsing fails
+                        continue;
+                    }
+                }
+            }
+            catch
+            {
+                // If parsing fails completely, return empty list
+            }
+
+            return results;
         }
 
         private RefreshItem ParseFormulaToRefreshItem(string formula, Excel.Range cell)
@@ -597,6 +681,180 @@ namespace CubeConnector
             int parenIndex = formula.IndexOf('(');
             if (parenIndex < 0) return null;
             return formula.Substring(1, parenIndex - 1).Trim();
+        }
+
+        /// <summary>
+        /// Extract all UDF function calls from a formula
+        /// Returns list of (FunctionName, FunctionCall) tuples
+        /// </summary>
+        private List<(string FunctionName, string FunctionCall)> ExtractAllUDFFunctionCalls(string formula, List<string> functionNames)
+        {
+            var results = new List<(string, string)>();
+
+            // Remove leading "=" if present
+            string searchFormula = formula.StartsWith("=") ? formula.Substring(1) : formula;
+
+            foreach (var funcName in functionNames)
+            {
+                int searchIndex = 0;
+
+                while (true)
+                {
+                    // Find next occurrence of "FunctionName("
+                    int startIndex = searchFormula.IndexOf(funcName + "(", searchIndex, StringComparison.OrdinalIgnoreCase);
+                    if (startIndex == -1) break;
+
+                    // Find the matching closing parenthesis
+                    int openParenIndex = startIndex + funcName.Length;
+                    int closeParenIndex = FindMatchingCloseParen(searchFormula, openParenIndex);
+
+                    if (closeParenIndex != -1)
+                    {
+                        // Extract the complete function call
+                        string functionCall = searchFormula.Substring(startIndex, closeParenIndex - startIndex + 1);
+                        results.Add((funcName, functionCall));
+                    }
+
+                    // Move past this occurrence
+                    searchIndex = startIndex + funcName.Length + 1;
+                }
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Find the matching closing parenthesis for an opening parenthesis
+        /// </summary>
+        private int FindMatchingCloseParen(string text, int openParenIndex)
+        {
+            if (openParenIndex >= text.Length || text[openParenIndex] != '(')
+                return -1;
+
+            int depth = 1;
+            bool inQuotes = false;
+            char quoteChar = '\0';
+
+            for (int i = openParenIndex + 1; i < text.Length; i++)
+            {
+                char c = text[i];
+
+                // Handle quotes
+                if ((c == '"' || c == '\'') && (i == 0 || text[i - 1] != '\\'))
+                {
+                    if (!inQuotes)
+                    {
+                        inQuotes = true;
+                        quoteChar = c;
+                    }
+                    else if (c == quoteChar)
+                    {
+                        inQuotes = false;
+                    }
+                }
+                else if (!inQuotes)
+                {
+                    if (c == '(')
+                    {
+                        depth++;
+                    }
+                    else if (c == ')')
+                    {
+                        depth--;
+                        if (depth == 0)
+                        {
+                            return i;
+                        }
+                    }
+                }
+            }
+
+            return -1; // No matching close paren found
+        }
+
+        /// <summary>
+        /// Parse parameters from a function call string like "MyFunc(1,2,3)"
+        /// </summary>
+        private string[] ParseFunctionCallParameters(string functionCall, Excel.Range cell, UDFConfig config)
+        {
+            // Extract the part between parentheses
+            int openParen = functionCall.IndexOf('(');
+            int closeParen = functionCall.LastIndexOf(')');
+
+            if (openParen < 0 || closeParen < 0 || closeParen <= openParen)
+            {
+                return new string[0];
+            }
+
+            string argsString = functionCall.Substring(openParen + 1, closeParen - openParen - 1);
+            var argTokens = SplitFormulaArguments(argsString);
+
+            var parameters = new List<string>();
+
+            for (int i = 0; i < argTokens.Count; i++)
+            {
+                string cleanToken = argTokens[i].Trim();
+
+                // Get parameter config for this position
+                ParameterConfig paramConfig = null;
+                if (config?.Parameters != null && i < config.Parameters.Count)
+                {
+                    paramConfig = config.Parameters[i];
+                }
+
+                if (string.IsNullOrEmpty(cleanToken))
+                {
+                    parameters.Add("");
+                    continue;
+                }
+
+                if ((cleanToken.StartsWith("\"") && cleanToken.EndsWith("\"")) ||
+                    (cleanToken.StartsWith("'") && cleanToken.EndsWith("'")))
+                {
+                    parameters.Add(cleanToken.Trim('"', '\''));
+                }
+                else if (double.TryParse(cleanToken, out double numValue))
+                {
+                    // Normalize the number value (might be a year for date parameters)
+                    parameters.Add(NormalizeParameterValue(numValue, paramConfig));
+                }
+                else
+                {
+                    try
+                    {
+                        Excel.Range refRange = cell.Worksheet.Range[cleanToken];
+                        var value = refRange.Value2;
+
+                        if (refRange.Cells.Count > 1)
+                        {
+                            var values = new List<string>();
+                            foreach (Excel.Range c in refRange.Cells)
+                            {
+                                var v = c.Value2;
+                                if (v != null) values.Add(NormalizeParameterValue(v, paramConfig));
+                            }
+                            parameters.Add(string.Join(",", values));
+                        }
+                        else
+                        {
+                            parameters.Add(NormalizeParameterValue(value, paramConfig));
+                        }
+                    }
+                    catch
+                    {
+                        parameters.Add(cleanToken);
+                    }
+                }
+            }
+
+            // Dynamically pad to match the number of parameters in the config
+            int expectedParamCount = config?.Parameters?.Count ?? 0;
+            while (parameters.Count < expectedParamCount)
+            {
+                parameters.Add("");
+            }
+
+            return parameters.ToArray();
         }
 
         /// <summary>
