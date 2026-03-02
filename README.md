@@ -6,22 +6,16 @@
 [![Power BI](https://img.shields.io/badge/Power%20BI-Pro%20|%20Premium%20|%20Fabric-F2C811)](https://powerbi.microsoft.com/)
 [![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)](https://github.com/[owner]/CubeConnector/releases)
 
-A fast, flexible Excel add-in built on Excel-DNA that creates dynamic Excel functions (UDFs) to query Power BI datasets with intelligent caching and drillthrough capabilities.
+A fast, flexible Excel add-in that allows you to expose your PowerBI measures as excel functions with intelligent caching and drillthrough capabilities.
 
 ## Overview
 
-CubeConnector is a faster, easier, and more flexible alternative to Excel's built-in cube functions. Instead of manually writing complex formulas or relying on static pivot tables, you define custom Excel functions in a JSON configuration file that query Power BI measures directly. Each function can accept up to 15 user-defined parameters, works seamlessly in arithmetic expressions and formulas, and supports model-defined drillthrough capabilities.
+CubeConnector is a faster, easier, and more flexible alternative to Excel's built-in cube functions. You can expose any measure from your model and define up to 15 parameters for filtering. The params support single values, arrays of values, rangestart, and rangeend.
 ![Cube Connector Demo](images/CCdemo_small.gif)
 
 ## Security and Authentication
 
-CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infrastructure for secure, seamless authentication:
-
-- **Microsoft-Managed Authentication**: All authentication and token management is handled by Microsoft
-- **No Credential Storage**: CubeConnector cannot access or store your credentials
-- **Existing Security Respected**: All Row-Level Security (RLS) and model security permissions are fully respected
-- **Zero Trust Required**: No admin rights, permissions, or delegations needed
-- **User Control**: Cautious users can manually create their own connection strings
+CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infrastructure for secure auth within your own tenant. This means that CubeConnector can function without any elevated permissions, admin, or trusted apps.
 
 ## How It Works
 
@@ -29,7 +23,7 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 2. **Configure Parameters**: Each function accepts up to 15 parameters, each bound to a `Table[Field]` in your model for filtering
 3. **Dynamic Registration**: Functions are automatically registered with Excel when the add-in loads, appearing like any other built-in Excel function
 4. **Execute Queries**: When called, CubeConnector dynamically generates and executes DAX queries against your Power BI connection
-5. **Intelligent Caching**: Results are cached for performance, with manual and automatic refresh options
+5. **Intelligent Caching**: Results are cached for performance and queries are pooled and batched where possible.
 
 ## Key Features
 
@@ -39,41 +33,19 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 - **Formula autocomplete**: Functions appear in Excel's IntelliSense like built-in functions
 - **Type-safe results**: Proper numeric marshaling for calculations and aggregations
 
-### Intelligent Caching
-- Query results are cached in a hidden worksheet table
-- Dramatically improves performance for repeated queries
-- Manual and automatic refresh options with Force Refresh capability
-- Smart detection of cells needing refresh (#REFRESH and #VALUE! errors)
-- Cache invalidation strategies for data accuracy
-
-### Drillthrough Capabilities
-- **Drill to Details**: Right-click any cell to see the underlying detail records
-- **Drill to Pivot**: Convert a query result into a filtered pivot table for further exploration
-- Context menu integration for seamless workflows
-- Intelligent protection against ambiguous drill scenarios
-
 ### Flexible Parameter System
 - Support for multiple filter types:
   - List filters (comma-separated values)
-  - RangeStart or RangeEnd (start/end dates)
+  - RangeStart or RangeEnd (start/end dates or numeric ranges)
 - Optional parameters
 - Type-safe parameter handling (text, date, numeric)
 
 ### Excel Ribbon Integration
 - Custom "CubeConnector" group in the Data tab
 - Quick access to:
-  - Refresh cache (with Force Refresh option)
+  - Refresh
   - Clear cache
-  - Drill to details
-  - Drill to pivot
-
-## Use Cases
-
-- **Financial Reporting**: Create reusable functions for budget analysis, variance reporting, and KPI tracking
-- **Sales Analytics**: Build custom functions for revenue analysis, customer segmentation, and pipeline reporting
-- **Operational Dashboards**: Query real-time operational metrics directly in Excel
-- **Ad-hoc Analysis**: Quickly slice and dice Power BI data without leaving Excel
-- **Data Distribution**: Share Excel templates with embedded Power BI queries
+  - Drill to details - creates a querytable calling the drillthough expression configured by the developer of the semantic model
 
 ## System Requirements
 
@@ -97,7 +69,7 @@ Use the [CubeConnector Config Wizard](https://ejheflin.github.io/CubeConnector/)
 2. Click "Open Config" and select your `CubeConnectorConfig.json` file
 3. Enter your Tenant ID once in the sidebar
 4. Add functions and configure their dataset IDs, measure names, and parameters
-5. Click "Save Config" to write changes back to your file
+5. Click "Save Config" to write changes back to your json file
 
 **Note:** The config wizard is optional - advanced users can edit the JSON directly (see Option 2).
 
@@ -176,11 +148,6 @@ Edit the `CubeConnectorConfig.json` file directly in the same directory as the `
 2. Select the `CubeConnector.xll` file from the downloaded directory
 3. Click OK to enable the add-in
 
-**Key Benefits:**
-- ✅ No administrative rights required
-- ✅ No permissions or delegations needed
-- ✅ Just load the XLL - that's it!
-
 ### Basic Usage
 
 Once configured, your custom functions appear in Excel's formula autocomplete:
@@ -228,11 +195,6 @@ Where:
 1. Click on a cell with a CubeConnector function result
 2. Right-click → "CubeConnector - Drill to Details"
 3. A new sheet opens with the underlying detail records
-
-**Drill to Pivot:**
-1. Click on a cell with a CubeConnector function result
-2. Right-click → "CubeConnector - Drill to Pivot"
-3. A new sheet opens with an interactive pivot table
 
 **Important**: Drill features only support cells with a **single** CubeConnector function. If a cell contains multiple UDFs (e.g., `=MyFunc(1)+MyFunc(2)`), you'll receive a warning and drillthrough will be cancelled. For drillthrough on combined results, create separate cells for each function first.
 
@@ -297,29 +259,9 @@ The cache is stored in a hidden worksheet named `__CubeConnector_Cache__` with a
 - Restart Excel after configuration changes
 
 **No Data Returned:**
-- Verify workspace ID and dataset ID are correct
+- Verify tenant ID and dataset ID are correct
 - Check Power BI dataset is published and accessible
-- Ensure measure name exactly matches (case-sensitive)
-
-## Project Structure
-
-```
-CubeConnector/
-├── CacheKey.cs                    # Cache key generation and hashing
-├── CacheManager.cs                # Cache table management
-├── ConfigurationStore.cs          # JSON configuration loading
-├── CubeConnectorFunctions.cs      # UDF entry points
-├── CubeConnectorRibbon.cs         # Excel ribbon UI
-├── DAXQueryBuilder.cs             # Dynamic DAX query generation
-├── DrillthroughManager.cs         # Drill-to-details functionality
-├── DynamicFunctionRegistration.cs # Function registration engine
-├── PivotManager.cs                # Drill-to-pivot functionality
-├── QueryPoolAnalyzer.cs           # Query optimization and analysis
-├── RefreshManager.cs              # Cache refresh orchestration
-├── UDFConfig.cs                   # Configuration models
-├── CubeConnectorConfig.json       # User configuration file
-└── packages.config                # NuGet dependencies
-```
+- Ensure measure name and params match the model exactly (case-sensitive)
 
 ## Technologies Used
 
