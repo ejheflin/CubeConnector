@@ -492,48 +492,51 @@ namespace CubeConnector
                     System.Windows.Forms.MessageBoxIcon.Error);
             }
         }
+        /// <summary>Deterministic workbook-connection name for a dataset (connections allow long names).</summary>
+        internal static string ConnectionNameForDataset(string datasetId)
+        {
+            var sb = new System.Text.StringBuilder("CubeConnector_");
+            foreach (char c in datasetId ?? "") if (char.IsLetterOrDigit(c)) sb.Append(c);
+            return sb.ToString();
+        }
+
+        /// <summary>Short stable id (first 8 alphanumerics of the dataset GUID) for sheet/listobject names (Excel sheet names max 31 chars).</summary>
+        internal static string ShortDatasetId(string datasetId)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in datasetId ?? "") { if (char.IsLetterOrDigit(c)) sb.Append(c); if (sb.Length >= 8) break; }
+            return sb.Length > 0 ? sb.ToString() : "ds";
+        }
+
+        /// <summary>Create the workbook connection for one dataset if it doesn't already exist.</summary>
+        internal static void EnsureConnectionForDataset(UDFConfig config)
+        {
+            var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
+            var workbook = app.ActiveWorkbook;
+            string connName = ConnectionNameForDataset(config.DatasetId);
+            try { var existing = workbook.Connections[connName]; return; } catch { }
+            string connectionString = ModelIntrospector.BuildConnectionString(config.DatasetId, config.TenantId);
+            workbook.Connections.Add2(
+                Name: connName,
+                Description: "CubeConnector dataset connection",
+                ConnectionString: connectionString,
+                CommandText: "Model",
+                lCmdtype: Microsoft.Office.Interop.Excel.XlCmdType.xlCmdDefault,
+                CreateModelConnection: Type.Missing,
+                ImportRelationships: Type.Missing);
+        }
+
         internal static void EnsureConnectionExists()
         {
             try
             {
-                var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
-                var workbook = app.ActiveWorkbook;
-                string connName = "CubeConnector";
-
-                // Check if connection already exists
-                try
-                {
-                    var existingConn = workbook.Connections[connName];
-                    return; // Connection exists, we're done
-                }
-                catch
-                {
-                    // Connection doesn't exist, create it
-                }
-
-                // Get first config to extract connection details
                 var configs = ConfigurationStore.GetAllConfigs();
                 if (configs == null || configs.Count == 0)
-                {
                     throw new Exception("No configuration found. Cannot create connection.");
-                }
-
-                var config = configs[0]; // Use first config for the dataset
-
-                // Build the Power BI connection string via the shared builder, which uses the
-                // fixed Analyze-in-Excel client id in the Identity Provider field (NOT a tenant).
-                string connectionString = ModelIntrospector.BuildConnectionString(config.DatasetId, config.TenantId);
-
-                // Create the connection
-                workbook.Connections.Add2(
-                    Name: connName,
-                    Description: "Auto-created by CubeConnector",
-                    ConnectionString: connectionString,
-                    CommandText: "Model",
-                    lCmdtype: Microsoft.Office.Interop.Excel.XlCmdType.xlCmdDefault,
-                    CreateModelConnection: Type.Missing,
-                    ImportRelationships: Type.Missing
-                );
+                var seen = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+                foreach (var c in configs)
+                    if (!string.IsNullOrEmpty(c.DatasetId) && seen.Add(c.DatasetId))
+                        EnsureConnectionForDataset(c);
             }
             catch (Exception ex)
             {

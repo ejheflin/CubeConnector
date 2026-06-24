@@ -433,15 +433,16 @@ namespace CubeConnector
         {
             try
             {
-                // Get the existing connection to extract connection details
+                // Get the existing connection for this cell's dataset to extract connection details
                 Excel.WorkbookConnection existingConn;
                 try
                 {
-                    existingConn = workbook.Connections["CubeConnector"];
+                    DynamicFunctionRegistration.EnsureConnectionForDataset(item.Config);
+                    existingConn = workbook.Connections[DynamicFunctionRegistration.ConnectionNameForDataset(item.Config.DatasetId)];
                 }
                 catch
                 {
-                    throw new Exception("Connection 'CubeConnector' not found.");
+                    throw new Exception("Connection '" + DynamicFunctionRegistration.ConnectionNameForDataset(item.Config.DatasetId) + "' not found.");
                 }
 
                 // Extract connection string
@@ -1118,11 +1119,14 @@ namespace CubeConnector
                     }
                 }
 
-                // Get the connection
+                // Get the connection for the first configured dataset
+                var firstConfig = ConfigurationStore.GetAllConfigs().FirstOrDefault();
+                if (firstConfig == null) return;
                 Excel.WorkbookConnection existingConn;
                 try
                 {
-                    existingConn = workbook.Connections["CubeConnector"];
+                    DynamicFunctionRegistration.EnsureConnectionForDataset(firstConfig);
+                    existingConn = workbook.Connections[DynamicFunctionRegistration.ConnectionNameForDataset(firstConfig.DatasetId)];
                 }
                 catch
                 {
