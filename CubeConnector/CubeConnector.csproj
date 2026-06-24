@@ -167,6 +167,7 @@
     <Compile Include="PowerBiAuth.cs" />
     <Compile Include="PowerBiRestClient.cs" />
     <Compile Include="EnumerateModelsSmokeTest.cs" />
+    <Compile Include="WizardBridge.cs" />
     <Compile Include="PivotManager.cs" />
     <Compile Include="QueryPoolAnalyzer.cs" />
     <Compile Include="RefreshManager.cs" />
