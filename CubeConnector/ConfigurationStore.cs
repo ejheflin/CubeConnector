@@ -40,6 +40,8 @@ namespace CubeConnector
             return _configs;
         }
 
+        public static void Invalidate() { _configs = null; }
+
         public static UDFConfig GetConfig(string functionName)
         {
             return GetAllConfigs().FirstOrDefault(c =>
