@@ -158,6 +158,7 @@
     <Compile Include="CubeConnectorRibbon.cs" />
     <Compile Include="DAXQueryBuilder.cs" />
     <Compile Include="ConfigurationStore.cs" />
+    <Compile Include="FunctionStore.cs" />
     <Compile Include="DrillthroughManager.cs" />
     <Compile Include="DynamicFunctionRegistration.cs" />
     <Compile Include="ModelIntrospector.cs" />
