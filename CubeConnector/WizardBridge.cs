@@ -75,11 +75,55 @@ namespace CubeConnector
             try { return Ok(new { functions = FunctionStore.GetAll() }); } catch (Exception e) { return Err(e); }
         }
 
+        // Loosely-typed save DTO: FilterType arrives as a STRING from the UI.
+        // JavaScriptSerializer can't deserialize the FilterType enum from a name,
+        // so we receive all-primitive fields and map to UDFConfig via Enum.TryParse.
+        private class SaveDto
+        {
+            public string FunctionName { get; set; }
+            public string MeasureName { get; set; }
+            public string DatasetId { get; set; }
+            public string TenantId { get; set; }
+            public string DatasetPrefix { get; set; }
+            public List<SaveParam> Parameters { get; set; }
+        }
+        private class SaveParam
+        {
+            public string Name { get; set; }
+            public int Position { get; set; }
+            public string TableName { get; set; }
+            public string FieldName { get; set; }
+            public string DataType { get; set; }
+            public string FilterType { get; set; }
+            public bool IsOptional { get; set; }
+        }
+
         public string SaveFunction(string json)
         {
             try {
-                var dto = J.Deserialize<UDFConfig>(json);
-                FunctionStore.Save(dto);
+                var dto = J.Deserialize<SaveDto>(json);
+                if (dto == null) throw new ArgumentException("No function data.");
+                var config = new UDFConfig
+                {
+                    FunctionName = dto.FunctionName,
+                    MeasureName = dto.MeasureName,
+                    DatasetId = dto.DatasetId,
+                    TenantId = dto.TenantId,
+                    DatasetPrefix = dto.DatasetPrefix,
+                    Parameters = new List<ParameterConfig>()
+                };
+                foreach (var p in dto.Parameters ?? new List<SaveParam>())
+                {
+                    var pc = new ParameterConfig
+                    {
+                        Name = p.Name, Position = p.Position, TableName = p.TableName,
+                        FieldName = p.FieldName, DataType = p.DataType ?? "text", IsOptional = p.IsOptional
+                    };
+                    if (!string.IsNullOrEmpty(p.FilterType) && Enum.TryParse(p.FilterType, true, out FilterType ft))
+                        pc.FilterType = ft;
+                    config.Parameters.Add(pc);
+                }
+                FunctionStore.Save(config);
                 return Ok(new { ok = true });
             } catch (Exception e) { return Err(e); }
         }
