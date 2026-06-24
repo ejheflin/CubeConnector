@@ -176,11 +176,11 @@ namespace CubeConnector
                 try
                 {
                     DynamicFunctionRegistration.EnsureConnectionForDataset(item.Config);
-                    conn = workbook.Connections[DynamicFunctionRegistration.ConnectionNameForDataset(item.Config.DatasetId)];
+                    conn = workbook.Connections[DynamicFunctionRegistration.ConnectionNameForDataset(item.Config)];
                 }
                 catch
                 {
-                    throw new Exception("Connection '" + DynamicFunctionRegistration.ConnectionNameForDataset(item.Config.DatasetId) + "' not found.");
+                    throw new Exception("Connection '" + DynamicFunctionRegistration.ConnectionNameForDataset(item.Config) + "' not found.");
                 }
 
                 // Generate unique sheet name

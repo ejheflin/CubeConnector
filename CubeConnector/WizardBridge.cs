@@ -85,6 +85,7 @@ namespace CubeConnector
             public string DatasetId { get; set; }
             public string TenantId { get; set; }
             public string DatasetPrefix { get; set; }
+            public string ModelName { get; set; }
             public List<SaveParam> Parameters { get; set; }
         }
         private class SaveParam
@@ -110,6 +111,7 @@ namespace CubeConnector
                     DatasetId = dto.DatasetId,
                     TenantId = dto.TenantId,
                     DatasetPrefix = dto.DatasetPrefix,
+                    ModelName = dto.ModelName,
                     Parameters = new List<ParameterConfig>()
                 };
                 foreach (var p in dto.Parameters ?? new List<SaveParam>())

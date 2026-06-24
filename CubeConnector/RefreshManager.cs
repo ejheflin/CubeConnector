@@ -135,7 +135,7 @@ namespace CubeConnector
                 {
                     var groupCells = group.ToList();
                     DynamicFunctionRegistration.EnsureConnectionForDataset(groupCells[0].Config);
-                    string connName = DynamicFunctionRegistration.ConnectionNameForDataset(group.Key);
+                    string connName = DynamicFunctionRegistration.ConnectionNameForDataset(groupCells[0].Config);
                     string shortId = DynamicFunctionRegistration.ShortDatasetId(group.Key);
                     string querySheetName = "__CC_Q_" + shortId + "__";   // <=31 chars
                     string listObjName = "CC_QT_" + shortId;

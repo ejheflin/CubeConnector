@@ -48,6 +48,7 @@ namespace CubeConnector
             [DataMember(Name = "tenantId")] public string tenantId { get; set; }
             [DataMember(Name = "datasetPrefix")] public string datasetPrefix { get; set; }
             [DataMember(Name = "datasetId")] public string datasetId { get; set; }
+            [DataMember(Name = "modelName")] public string modelName { get; set; }
             [DataMember(Name = "measureName")] public string measureName { get; set; }
             [DataMember(Name = "parameters")] public List<ParamJson> parameters { get; set; }
         }
@@ -202,6 +203,7 @@ namespace CubeConnector
                 TenantId = f.tenantId,
                 DatasetPrefix = f.datasetPrefix,
                 DatasetId = f.datasetId,
+                ModelName = f.modelName,
                 MeasureName = f.measureName,
                 Parameters = new List<ParameterConfig>()
             };
@@ -228,7 +230,7 @@ namespace CubeConnector
             return new FuncJson
             {
                 functionName = c.FunctionName, tenantId = c.TenantId, datasetPrefix = c.DatasetPrefix,
-                datasetId = c.DatasetId, measureName = c.MeasureName,
+                datasetId = c.DatasetId, modelName = c.ModelName, measureName = c.MeasureName,
                 parameters = (c.Parameters ?? new List<ParameterConfig>()).Select(p => new ParamJson
                 {
                     name = p.Name, position = p.Position, tableName = p.TableName, fieldName = p.FieldName,

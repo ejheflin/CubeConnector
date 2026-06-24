@@ -492,12 +492,22 @@ namespace CubeConnector
                     System.Windows.Forms.MessageBoxIcon.Error);
             }
         }
-        /// <summary>Deterministic workbook-connection name for a dataset (connections allow long names).</summary>
-        internal static string ConnectionNameForDataset(string datasetId)
+        /// <summary>Human-readable workbook-connection name for a dataset: "&lt;ModelName&gt; (&lt;shortId&gt;)".</summary>
+        internal static string ConnectionNameForDataset(UDFConfig config)
         {
-            var sb = new System.Text.StringBuilder("CubeConnector_");
-            foreach (char c in datasetId ?? "") if (char.IsLetterOrDigit(c)) sb.Append(c);
-            return sb.ToString();
+            string model = (config != null ? config.ModelName : null) ?? "";
+            model = model.Trim();
+            string label;
+            if (model.Length == 0) label = "CubeConnector Data";
+            else
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (char c in model)
+                    if (char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '_') sb.Append(c);
+                label = sb.ToString().Trim();
+                if (label.Length == 0) label = "CubeConnector Data";
+            }
+            return label + " (" + ShortDatasetId(config != null ? config.DatasetId : null) + ")";
         }
 
         /// <summary>Short stable id (first 8 alphanumerics of the dataset GUID) for sheet/listobject names (Excel sheet names max 31 chars).</summary>
@@ -513,7 +523,7 @@ namespace CubeConnector
         {
             var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
             var workbook = app.ActiveWorkbook;
-            string connName = ConnectionNameForDataset(config.DatasetId);
+            string connName = ConnectionNameForDataset(config);
             try { var existing = workbook.Connections[connName]; return; } catch { }
             string connectionString = ModelIntrospector.BuildConnectionString(config.DatasetId, config.TenantId);
             workbook.Connections.Add2(
