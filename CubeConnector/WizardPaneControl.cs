@@ -16,12 +16,20 @@
 
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
 namespace CubeConnector
 {
+    // Excel Custom Task Panes host an ActiveX/COM control, so the UserControl must be
+    // COM-visible with a stable CLSID — otherwise CreateCustomTaskPane fails with
+    // "Unable to create specified ActiveX control". (On .NET Framework, ComVisible + Guid
+    // is sufficient; the ComDefaultInterface dance is only needed on .NET 6+.)
+    [ComVisible(true)]
+    [Guid("7F3A2B14-9C6D-4E58-B1A2-3D4E5F6A7B8C")]
+    [ClassInterface(ClassInterfaceType.AutoDual)]
     public class WizardPaneControl : UserControl
     {
         private readonly WebView2 _web = new WebView2();
