@@ -40,6 +40,8 @@ namespace CubeConnector
         {
             try
             {
+                FunctionStore.MigrateLegacyIfNeeded();
+
                 // Store Excel Application reference for cache access
                 ExcelApp = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
 
