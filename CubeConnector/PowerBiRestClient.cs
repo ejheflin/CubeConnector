@@ -45,14 +45,19 @@ namespace CubeConnector
         // ---- in-memory dataset cache (prefetch on pane open) ----
 
         private static volatile List<DatasetInfo> _cache;
+        private static volatile bool _warming;
 
         /// <summary>
         /// Best-effort silent prefetch: if a token is already available (WAM/cached),
         /// populate the dataset cache in the background so the UI dropdown is instant.
-        /// Safe to call from a background thread; silently swallows any error.
+        /// Safe to call from a background thread and idempotent — if the cache is already
+        /// populated or a warm is in flight, it returns immediately (so firing it from both
+        /// the ribbon click and the pane load never double-fetches).
         /// </summary>
         public static void WarmDatasetCache()
         {
+            if (_cache != null || _warming) return;
+            _warming = true;
             try
             {
                 string token = PowerBiAuth.GetAccessToken(out _, out _); // silent path if available
@@ -60,6 +65,7 @@ namespace CubeConnector
                     _cache = GetAllDatasets(token);
             }
             catch { /* prefetch is best-effort — never surface errors here */ }
+            finally { _warming = false; }
         }
 
         /// <summary>
