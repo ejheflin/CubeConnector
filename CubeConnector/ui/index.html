@@ -1,11 +1,40 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>CubeConnector</title></head>
-<body style="font-family:sans-serif;padding:20px">
-<h2>CubeConnector</h2>
-<p id="acct">Loading account…</p>
-<script>
-(async () => {
-  try { const r = JSON.parse(await window.chrome.webview.hostObjects.cc.GetAccount());
-        document.getElementById('acct').textContent = r.error ? ('Error: '+r.error) : ('Signed in: '+(r.upn||'(unknown)')); }
-  catch (e) { document.getElementById('acct').textContent = 'Bridge error: ' + e; }
-})();
-</script></body></html>
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CubeConnector</title>
+<link href="styles.css" rel="stylesheet"></head>
+<body>
+  <div id="app">
+    <div id="account" class="subtitle"></div>
+    <div id="restart" class="restart-banner" style="display:none">✓ Saved. Close and reopen Excel to use your changes.</div>
+
+    <!-- LIBRARY VIEW -->
+    <section id="libraryView">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="newFunction()">+ New formula</button>
+        <button class="btn" onclick="doImport()">Import formulas someone shared</button>
+        <button class="btn" onclick="doExport()">Export</button>
+      </div>
+      <h3 class="section-title" style="margin-top:14px">Your formulas</h3>
+      <div id="functionList"></div>
+    </section>
+
+    <!-- EDITOR VIEW -->
+    <section id="editorView" style="display:none">
+      <a href="#" onclick="showLibrary();return false;">‹ Back</a>
+      <h3>① What data? <span class="tech-term">(model)</span><span class="helper" title="The Power BI dataset your formula pulls from. Pick the one that has the numbers you need.">?</span></h3>
+      <select id="modelSelect" class="cc-input" onchange="onModelChange()"></select>
+      <h3>② The number you want <span class="tech-term">(measure)</span><span class="helper" title="A ready-made calculation in your data, like Net Amount or Total Volume. Pick the one this formula returns.">?</span></h3>
+      <select id="measureSelect" class="cc-input" onchange="renderPreview()"></select>
+      <h3>③ Let people filter by… <span class="subtitle">(optional)</span><span class="helper" title="A filter lets whoever uses your formula narrow the result — e.g. to an account or a date range.">?</span></h3>
+      <div id="filterList"></div>
+      <button class="btn" onclick="addFilter()">+ Add a filter</button>
+      <h3>④ Name it</h3>
+      <input id="friendlyName" class="cc-input" placeholder="e.g. Net Amount" oninput="renderPreview()">
+      <div id="nameHint" class="subtitle"></div>
+      <div id="preview" class="formula-preview"></div>
+      <button class="btn btn-primary" onclick="saveFunction()" style="margin-top:12px">Save formula</button>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body></html>
