@@ -26,13 +26,22 @@ namespace CubeConnector
         public string SignInDifferent()
         {
             try { string t = PowerBiAuth.SignInAsDifferentAccount(out string err);
-                  return t == null ? J.Serialize(new { error = err }) : Ok(new { upn = PowerBiAuth.GetUpnFromToken(t) }); }
+                  if (t == null) return J.Serialize(new { error = err });
+                  ClearCaches();
+                  return Ok(new { upn = PowerBiAuth.GetUpnFromToken(t) }); }
             catch (Exception e) { return Err(e); }
         }
 
         public string UseWindowsAccount()
         {
-            try { PowerBiAuth.UseWindowsAccount(); return GetAccount(); } catch (Exception e) { return Err(e); }
+            try { PowerBiAuth.UseWindowsAccount(); ClearCaches(); return GetAccount(); } catch (Exception e) { return Err(e); }
+        }
+
+        // Identity changed -> the cached dataset list and model metadata are for the old account.
+        private static void ClearCaches()
+        {
+            PowerBiRestClient.ClearCache();
+            _modelCache.Clear();
         }
 
         public string ListDatasets()
@@ -46,22 +55,30 @@ namespace CubeConnector
             } catch (Exception e) { return Err(e); }
         }
 
+        // Per-dataset model metadata cache so re-opening / switching back to a model is instant.
+        private static readonly Dictionary<string, ModelMetadata> _modelCache =
+            new Dictionary<string, ModelMetadata>(StringComparer.OrdinalIgnoreCase);
+
         public string GetModel(string datasetId, string groupId)
         {
             try {
-                string token = PowerBiAuth.GetAccessToken(out _, out string err);
-                if (token == null) return J.Serialize(new { error = err ?? "sign-in failed" });
                 ModelMetadata md;
-                try { md = PowerBiRestClient.ExecuteQueriesIntrospect(token, groupId, datasetId); }
-                catch {
-                    // Fallback: MSOLAP via ModelIntrospector (may prompt once).
-                    string tenantId = PowerBiAuth.GetTidFromTokenPublic(token);
-                    var app = (Microsoft.Office.Interop.Excel.Application)ExcelDna.Integration.ExcelDnaUtil.Application;
-                    var info = ModelIntrospector.IntrospectDataset(app.ActiveWorkbook ?? app.Workbooks.Add(), datasetId, tenantId);
-                    md = new ModelMetadata();
-                    md.Tables.AddRange(info.Tables.Select(t => t.Name));
-                    md.Measures.AddRange(info.Measures.Select(m => new ModelMeasure { Table = m.Table, Name = m.Name }));
-                    md.Columns.AddRange(info.Columns.Select(c => new ModelColumn { Table = c.Table, Name = c.Name, DataType = c.DataType, IsHidden = c.IsHidden }));
+                if (!_modelCache.TryGetValue(datasetId ?? "", out md))
+                {
+                    string token = PowerBiAuth.GetAccessToken(out _, out string err);
+                    if (token == null) return J.Serialize(new { error = err ?? "sign-in failed" });
+                    try { md = PowerBiRestClient.ExecuteQueriesIntrospect(token, groupId, datasetId); }
+                    catch {
+                        // Fallback: MSOLAP via ModelIntrospector (may prompt once).
+                        string tenantId = PowerBiAuth.GetTidFromTokenPublic(token);
+                        var app = (Microsoft.Office.Interop.Excel.Application)ExcelDna.Integration.ExcelDnaUtil.Application;
+                        var info = ModelIntrospector.IntrospectDataset(app.ActiveWorkbook ?? app.Workbooks.Add(), datasetId, tenantId);
+                        md = new ModelMetadata();
+                        md.Tables.AddRange(info.Tables.Select(t => t.Name));
+                        md.Measures.AddRange(info.Measures.Select(m => new ModelMeasure { Table = m.Table, Name = m.Name }));
+                        md.Columns.AddRange(info.Columns.Select(c => new ModelColumn { Table = c.Table, Name = c.Name, DataType = c.DataType, IsHidden = c.IsHidden }));
+                    }
+                    if (!string.IsNullOrEmpty(datasetId)) _modelCache[datasetId] = md;
                 }
                 return Ok(new {
                     measures = md.Measures.Select(m => new { m.Table, m.Name }),

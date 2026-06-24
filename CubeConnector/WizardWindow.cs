@@ -31,6 +31,9 @@ namespace CubeConnector
                 var env = await CoreWebView2Environment.CreateAsync(null, userData);
                 await _web.EnsureCoreWebView2Async(env);
 
+                // Follow the OS/Office light-or-dark theme so the UI's prefers-color-scheme matches.
+                try { _web.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Auto; } catch { }
+
                 _web.CoreWebView2.AddHostObjectToScript("cc", new WizardBridge());
 
                 string uiDir = Path.Combine(Path.GetDirectoryName(

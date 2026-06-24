@@ -79,6 +79,9 @@ namespace CubeConnector
             return _cache;
         }
 
+        /// <summary>Drop the dataset cache (e.g. after switching accounts).</summary>
+        public static void ClearCache() { _cache = null; }
+
         // ---- DataContract response shapes ----
 
         [DataContract]
