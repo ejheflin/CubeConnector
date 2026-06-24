@@ -1,10 +1,29 @@
+/*
+ * CubeConnector - Excel-DNA add-in for querying Power BI datasets
+ * Copyright (C) 2026
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * For enterprise licensing options, please contact the project maintainers.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace CubeConnector
@@ -96,7 +115,10 @@ namespace CubeConnector
 
         public static ImportResult Import(string path, ImportPolicy policy)
         {
-            var incoming = ReadWrapperFrom(path) ?? new FileWrapper { functions = new List<FuncJson>() };
+            FileWrapper incoming;
+            try { incoming = ReadWrapperFrom(path); }
+            catch (Exception ex) { throw new InvalidOperationException("Couldn't read the shared formulas file. It may be corrupt or not a CubeConnector export.", ex); }
+            if (incoming == null) incoming = new FileWrapper { functions = new List<FuncJson>() };
             var current = ReadFile() ?? new FileWrapper { functions = new List<FuncJson>() };
             var result = new ImportResult();
 
@@ -184,7 +206,7 @@ namespace CubeConnector
                 Parameters = new List<ParameterConfig>()
             };
             if (!string.IsNullOrEmpty(c.DatasetPrefix) && !string.IsNullOrEmpty(c.DatasetId)
-                && Guid.TryParse(c.DatasetId, out _) && !c.DatasetId.StartsWith(c.DatasetPrefix))
+                && c.DatasetId.Length == 36 && Guid.TryParse(c.DatasetId, out _) && !c.DatasetId.StartsWith(c.DatasetPrefix))
                 c.DatasetId = c.DatasetPrefix + c.DatasetId;
             if (f.parameters != null)
                 foreach (var p in f.parameters)
