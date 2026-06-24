@@ -518,15 +518,11 @@ namespace CubeConnector
                     throw new Exception("No configuration found. Cannot create connection.");
                 }
 
-                var config = configs[0]; // Use first config for tenant/dataset
+                var config = configs[0]; // Use first config for the dataset
 
-                // Build Power BI connection string (same format as your old ThisAddIn)
-                string connectionString = $"OLEDB;Provider=MSOLAP.8;Integrated Security=ClaimsToken;Persist Security Info=True;" +
-                    $"Initial Catalog={config.DatasetId};" +
-                    $"Data Source=pbiazure://api.powerbi.com;" +
-                    $"MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;" +
-                    $"Identity Provider=https://login.microsoftonline.com/common, https://analysis.windows.net/powerbi/api, {config.TenantId};" +
-                    $"Update Isolation Level=2";
+                // Build the Power BI connection string via the shared builder, which uses the
+                // fixed Analyze-in-Excel client id in the Identity Provider field (NOT a tenant).
+                string connectionString = ModelIntrospector.BuildConnectionString(config.DatasetId, config.TenantId);
 
                 // Create the connection
                 workbook.Connections.Add2(

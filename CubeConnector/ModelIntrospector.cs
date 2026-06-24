@@ -131,8 +131,18 @@ namespace CubeConnector
         }
 
         /// <summary>
-        /// Build the Pro-compatible MSOLAP connection string for a dataset, given its
-        /// catalog (e.g. "sobe_wowvirtualserver-&lt;guid&gt;" or a bare GUID) and tenant id.
+        /// Fixed Microsoft "Analyze in Excel" client id used in the MSOLAP Identity Provider
+        /// field. This is the SAME for every user/tenant — it is NOT a tenant id. (The third
+        /// Identity Provider value is an application/client id; the /common authority + the
+        /// user's interactive sign-in resolve the actual tenant.)
+        /// </summary>
+        public const string AnalyzeInExcelClientId = "929d0ec0-7a41-4b1e-bc7c-b754a28bddcc";
+
+        /// <summary>
+        /// Build the Pro-compatible MSOLAP connection string for a dataset from its catalog
+        /// (e.g. "sobe_wowvirtualserver-&lt;guid&gt;" or a bare GUID). The tenantId parameter is
+        /// accepted for compatibility but intentionally NOT used in the Identity Provider field
+        /// (that field needs the fixed AiE client id, not a tenant).
         /// </summary>
         public static string BuildConnectionString(string initialCatalog, string tenantId)
         {
@@ -146,7 +156,7 @@ namespace CubeConnector
                    "Data Source=pbiazure://api.powerbi.com;" +
                    "MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;" +
                    "Identity Provider=https://login.microsoftonline.com/common, " +
-                   "https://analysis.windows.net/powerbi/api, " + tenantId + ";" +
+                   "https://analysis.windows.net/powerbi/api, " + AnalyzeInExcelClientId + ";" +
                    "Update Isolation Level=2";
         }
 
