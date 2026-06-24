@@ -123,6 +123,14 @@ namespace CubeConnector
                         pc.FilterType = ft;
                     config.Parameters.Add(pc);
                 }
+                // The UI doesn't collect a tenant id; derive it from the signed-in token so the
+                // saved function can build its pbiazure connection. The user is already signed
+                // in, so this is a silent (cached) token acquisition.
+                if (string.IsNullOrEmpty(config.TenantId))
+                {
+                    string token = PowerBiAuth.GetAccessToken(out _, out _);
+                    if (!string.IsNullOrEmpty(token)) config.TenantId = PowerBiAuth.GetTidFromTokenPublic(token);
+                }
                 FunctionStore.Save(config);
                 return Ok(new { ok = true });
             } catch (Exception e) { return Err(e); }
