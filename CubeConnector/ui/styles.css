@@ -874,6 +874,7 @@ body {
   font-weight:700;cursor:help;margin-left:6px}
 .tech-term{color:var(--text-tertiary);font-weight:400}
 .restart-banner{background:#fef3c7;border-left:4px solid #f59e0b;color:#92400e;padding:10px 14px;border-radius:8px;margin:10px 0}
+.status-msg{background:#d1fae5;border-left:4px solid #10b981;color:#065f46;padding:10px 14px;border-radius:8px;margin:10px 0}
 
 /* Step 4 addition */
 .cc-input{width:100%;padding:.6rem .8rem;border:1.5px solid var(--border);border-radius:.5rem;

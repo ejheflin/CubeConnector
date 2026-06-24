@@ -141,6 +141,14 @@ namespace CubeConnector
             try { FunctionStore.Delete(name); return Ok(new { ok = true }); } catch (Exception e) { return Err(e); }
         }
 
+        public string ReloadFunctions()
+        {
+            try {
+                var r = DynamicFunctionRegistration.ReloadFunctions();
+                return Ok(new { reloaded = r.Reloaded, removedNeedRestart = r.RemovedNeedRestart });
+            } catch (Exception e) { return Err(e); }
+        }
+
         public string ExportFunctions(string namesJson, string path)
         {
             try { var names = J.Deserialize<List<string>>(namesJson) ?? new List<string>();

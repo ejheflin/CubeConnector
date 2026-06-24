@@ -120,8 +120,14 @@ async function saveFunction(){
   const dto = { FunctionName:'CC.'+friendly.replace(/[^A-Za-z0-9_]/g,''), MeasureName:'['+document.getElementById('measureSelect').value+']',
     DatasetId:CURRENT.DatasetId, TenantId:CURRENT.TenantId||'', Parameters:params };
   await call(cc.SaveFunction(JSON.stringify(dto)));
-  document.getElementById('restart').style.display='block';
   await refreshLibrary(); showLibrary();
+  // Reload functions into Excel without restarting (save never removes, so no restart needed)
+  try {
+    const r = await call(cc.ReloadFunctions());
+    showStatus('✓ Loaded — your formula is ready to use in Excel.');
+  } catch(e) {
+    showStatus('Saved. Reload into Excel failed: ' + e.message);
+  }
 }
 
 async function editFunction(name){
@@ -137,18 +143,52 @@ async function editFunction(name){
   CURRENT.Parameters = collapsed; renderFilters(); renderPreview();
 }
 async function delFunction(name){ if(!confirm('Delete '+name+'?'))return; await call(cc.DeleteFunction(name));
-  document.getElementById('restart').style.display='block'; await refreshLibrary(); }
+  await refreshLibrary();
+  // Reload so the bridge detects the removal and tells us a restart is needed
+  try {
+    const r = await call(cc.ReloadFunctions());
+    if (r.removedNeedRestart) document.getElementById('restart').style.display='block';
+  } catch(e) {
+    document.getElementById('restart').style.display='block';
+  }
+}
 
 async function doImport(){
   const path = prompt('Path to the shared formulas file (.json):'); if(!path) return;
   const policy = confirm('Overwrite formulas that already exist? (Cancel = keep both)') ? 'Overwrite' : 'KeepBoth';
   const r = await call(cc.ImportFunctions(path, policy));
   alert(`Imported: ${r.added} new, ${r.overwritten} replaced, ${r.skipped} skipped.`);
-  document.getElementById('restart').style.display='block'; await refreshLibrary();
+  await refreshLibrary();
+  try {
+    const rel = await call(cc.ReloadFunctions());
+    if (rel.removedNeedRestart) document.getElementById('restart').style.display='block';
+    else showStatus('✓ Imported formulas are ready to use in Excel.');
+  } catch(e) {
+    document.getElementById('restart').style.display='block';
+  }
 }
 async function doExport(){
   const path = prompt('Save shared file to (.json):'); if(!path) return;
   await call(cc.ExportFunctions(JSON.stringify([]), path)); alert('Exported to '+path);
+}
+
+function showStatus(msg){
+  const el = document.getElementById('status-msg');
+  el.textContent = msg; el.style.display='block';
+  clearTimeout(el._t); el._t = setTimeout(()=>{ el.style.display='none'; }, 5000);
+}
+
+async function reloadIntoExcel(){
+  try {
+    const r = await call(cc.ReloadFunctions());
+    if (r.removedNeedRestart) {
+      document.getElementById('restart').style.display='block';
+    } else {
+      showStatus('✓ Loaded — your formulas are ready to use in Excel.');
+    }
+  } catch(e) {
+    showStatus('Reload failed: ' + e.message);
+  }
 }
 
 boot();

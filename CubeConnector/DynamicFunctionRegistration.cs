@@ -31,10 +31,20 @@ namespace CubeConnector
     /// Excel-DNA add-in that dynamically registers functions based on JSON configuration
     /// </summary>
     /// 
+    public class ReloadResult
+    {
+        public int Reloaded;
+        public bool RemovedNeedRestart;
+    }
+
     public class DynamicFunctionRegistration : IExcelAddIn
     {
         // Static reference to Excel Application for cache access
         public static Microsoft.Office.Interop.Excel.Application ExcelApp { get; private set; }
+
+        // Track which function names have been registered so we can detect removals
+        private static readonly System.Collections.Generic.HashSet<string> _registeredNames =
+            new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
 
         public void AutoOpen()  // NOT static anymore
         {
@@ -49,12 +59,32 @@ namespace CubeConnector
                 if (configs == null || configs.Count == 0) return;
 
                 RegisterFunctionsFromConfig(configs);
+                foreach (var c in configs) _registeredNames.Add(c.FunctionName);
                 AddContextMenuItems();
             }
             catch (Exception ex)
             {
                 System.Windows.Forms.MessageBox.Show($"Error: {ex.Message}", "Error");
             }
+        }
+
+        /// <summary>
+        /// Invalidate config cache, re-register all functions, detect deletions.
+        /// Safe to call at runtime — Excel-DNA can register/update but not unregister.
+        /// </summary>
+        public static ReloadResult ReloadFunctions()
+        {
+            ConfigurationStore.Invalidate();
+            var configs = ConfigurationStore.GetAllConfigs() ?? new System.Collections.Generic.List<UDFConfig>();
+            RegisterFunctionsFromConfig(configs);
+            var current = new System.Collections.Generic.HashSet<string>(
+                configs.ConvertAll(c => c.FunctionName), System.StringComparer.OrdinalIgnoreCase);
+            bool removed = false;
+            foreach (var prev in _registeredNames)
+                if (!current.Contains(prev)) { removed = true; break; }
+            _registeredNames.Clear();
+            foreach (var n in current) _registeredNames.Add(n);
+            return new ReloadResult { Reloaded = configs.Count, RemovedNeedRestart = removed };
         }
 
         public void AutoClose()
@@ -89,10 +119,7 @@ namespace CubeConnector
                     registrationItems.Add(registration);
                     //System.Windows.Forms.MessageBox.Show($"Added to list: {config.FunctionName}", "Debug");
                 }
-                else
-                {
-                    System.Windows.Forms.MessageBox.Show($"Registration was NULL for: {config.FunctionName}", "Debug");
-                }
+                // else: CreateFunctionRegistration already shows a diagnostic MessageBox for config errors
             }
 
             //System.Windows.Forms.MessageBox.Show($"About to register {registrationItems.Count} functions", "Debug");
