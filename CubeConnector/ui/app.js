@@ -38,15 +38,15 @@ async function loadModels(){
   const o = await call(cc.ListDatasets());
   sel.innerHTML='';
   (o.datasets||[]).forEach(d => { const opt=document.createElement('option');
-    opt.value = JSON.stringify({id:d.Id, group:d.WorkspaceId});
+    opt.value = JSON.stringify({id:d.Id, group:d.WorkspaceId, name:d.Name});
     opt.textContent = (d.WorkspaceName||'') + ' ▸ ' + d.Name; sel.appendChild(opt); });
   if (sel.options.length) await onModelChange();
 }
 
 async function onModelChange(){
   const sel = document.getElementById('modelSelect'); if(!sel.value) return;
-  const {id, group} = JSON.parse(sel.value);
-  CURRENT.DatasetId = id; CURRENT._group = group;
+  const {id, group, name} = JSON.parse(sel.value);
+  CURRENT.DatasetId = id; CURRENT._group = group; CURRENT.ModelName = name;
   const ms = document.getElementById('measureSelect'); ms.innerHTML='<option>Loading…</option>';
   try { MODEL = await call(cc.GetModel(id, group||'')); }
   catch(e){ ms.innerHTML='<option>Couldn\'t read this data</option>'; return; }
@@ -118,7 +118,7 @@ async function saveFunction(){
     }
   });
   const dto = { FunctionName:'CC.'+friendly.replace(/[^A-Za-z0-9_]/g,''), MeasureName:'['+document.getElementById('measureSelect').value+']',
-    DatasetId:CURRENT.DatasetId, TenantId:CURRENT.TenantId||'', Parameters:params };
+    DatasetId:CURRENT.DatasetId, TenantId:CURRENT.TenantId||'', ModelName:CURRENT.ModelName||'', Parameters:params };
   await call(cc.SaveFunction(JSON.stringify(dto)));
   await refreshLibrary(); showLibrary();
   // Reload functions into Excel without restarting (save never removes, so no restart needed)
