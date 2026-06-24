@@ -128,125 +128,18 @@ namespace CubeConnector
 
                 //MessageBox.Show($"Found {cellsToRefresh.Count} cells needing refresh.\n\nAnalyzing query patterns...");
 
-                // Step 2: Analyze and create pools
-                var analysis = QueryPoolAnalyzer.AnalyzeQueries(cellsToRefresh, MIN_POOL_SIZE);
-
-                int pooledQueries = analysis.Pools.Sum(p => p.Items.Count);
-                int orphanQueries = analysis.Orphans.Count;
-
-                //MessageBox.Show($"Pool Analysis:\n\n" +
-                //    $"Pools created: {analysis.Pools.Count}\n" +
-                //    $"Queries in pools: {pooledQueries}\n" +
-                //    $"Orphan queries: {orphanQueries}\n\n" +
-                //    $"Building DAX queries...");
-
-                // Step 3: Build pooled queries and track which pools are in each query
-                var queryBatches = BuildPooledQueriesWithTracking(analysis.Pools, MAX_QUERY_LENGTH);
-
-                // DIAGNOSTIC: Show pool details
-                var poolDetails = string.Join("\n\n", analysis.Pools.Select((p, i) =>
-                    $"Pool {i + 1}:\n" +
-                    $"  Varying: Param{p.VaryingParamIndex}\n" +
-                    $"  Fixed: {string.Join(", ", p.FixedParameters.Select(kvp => $"Param{kvp.Key}='{kvp.Value}'"))}\n" +
-                    $"  Values: {p.VaryingValues.Count} items\n" +
-                    $"  Queries: {p.Items.Count} formulas"
-                ));
-
-                //MessageBox.Show($"Pool Details:\n\n{poolDetails}");
-
-                //MessageBox.Show($"Built {queryBatches.Count} pooled DAX queries.\n\n" +
-                //    $"Query lengths:\n{string.Join("\n", queryBatches.Select((q, i) => $"Query {i + 1}: {q.DaxQuery.Length:N0} chars, {q.Pools.Count} pools"))}");
-
-                // Step 4: Copy first query to clipboard for testing (commented out)
-                //if (queryBatches.Count > 0)
-                //{
-                //    string firstQuery = queryBatches[0].DaxQuery;
-                //    Clipboard.SetText(firstQuery);
-                //    MessageBox.Show($"First pooled query copied to clipboard!\n\n" +
-                //        $"Length: {firstQuery.Length:N0} characters\n\n" +
-                //        $"You can now paste this into DAX Studio to test.\n\n" +
-                //        $"Preview (first 500 chars):\n{firstQuery.Substring(0, Math.Min(500, firstQuery.Length))}...");
-                //}
-
-                // Step 5: Execute pooled queries
+                // Steps 2-6: Process each dataset group independently
                 int totalProcessed = 0;
                 int totalFailed = 0;
-
-                for (int i = 0; i < queryBatches.Count; i++)
+                foreach (var group in cellsToRefresh.GroupBy(c => c.Config.DatasetId ?? ""))
                 {
-                    var batch = queryBatches[i];
-
-                    try
-                    {
-                        //MessageBox.Show($"Executing pooled query {i + 1}/{queryBatches.Count}...");
-
-                        var results = ExecuteBatchQuery(batch.DaxQuery);
-
-                        //MessageBox.Show($"Query returned {results.Count} results.\n\n" +
-                        //    $"Sample keys:\n{string.Join("\n", results.Keys.Take(5))}");
-
-                        // Get items from the pools in this batch
-                        var itemsInThisBatch = batch.Pools.SelectMany(p => p.Items).ToList();
-
-                        //MessageBox.Show($"Batch contains {batch.Pools.Count} pools:\n\n" +
-                        //    string.Join("\n", batch.Pools.Select((p, idx) =>
-                        //        $"Pool {idx + 1}: {p.Items.Count} items, " +
-                        //        $"Sample key: {p.Items.FirstOrDefault()?.CacheKey ?? "N/A"}"
-                        //    )));
-
-                        var itemsToStore = PrepareResultsForStorage(results, itemsInThisBatch);
-
-                        //MessageBox.Show($"Prepared {itemsToStore.Count} items for storage.\n\n" +
-                        //    $"Sample:\n{string.Join("\n", itemsToStore.Take(3).Select(kvp => $"{kvp.Key} = {kvp.Value.result}"))}");
-
-                        CacheManager.StoreBatch(workbook, itemsToStore);
-                        totalProcessed += itemsToStore.Count;
-
-                        //MessageBox.Show($"Pooled query {i + 1}/{queryBatches.Count} complete!\n" +
-                        //    $"Stored {itemsToStore.Count} results");
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Pooled query {i + 1}/{queryBatches.Count} FAILED:\n\n{ex.Message}\n\n{ex.StackTrace}");
-                        totalFailed++;
-                    }
-                }
-
-                // Step 6: Handle orphan queries with traditional batching
-                if (analysis.Orphans.Count > 0)
-                {
-                    //MessageBox.Show($"Processing {analysis.Orphans.Count} orphan queries using traditional batching...");
-
-                    var orphansByFunction = analysis.Orphans.GroupBy(o => o.Config.FunctionName);
-
-                    foreach (var funcGroup in orphansByFunction)
-                    {
-                        var config = funcGroup.First().Config;
-                        var batchItems = funcGroup.Select(item => new DAXQueryBuilder.BatchQueryItem
-                        {
-                            CacheKey = item.CacheKey,
-                            Parameters = item.Parameters
-                        }).ToList();
-
-                        try
-                        {
-                            string orphanQuery = DAXQueryBuilder.BuildBatchQuery(config, batchItems);
-
-                            //MessageBox.Show($"Orphan query for {funcGroup.Key}:\n\n{orphanQuery.Substring(0, Math.Min(1000, orphanQuery.Length))}...", "Debug Query");
-                            Clipboard.SetText(orphanQuery);  // Copy to clipboard so you can test in DAX Studio
-
-
-                            var results = ExecuteBatchQuery(orphanQuery);
-                            var itemsToStore = PrepareResultsForStorage(results, analysis.Orphans);
-                            CacheManager.StoreBatch(workbook, itemsToStore);
-                            totalProcessed += itemsToStore.Count;
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show($"Orphan batch failed for {funcGroup.Key}:\n\n{ex.Message}");
-                            totalFailed += funcGroup.Count();
-                        }
-                    }
+                    var groupCells = group.ToList();
+                    DynamicFunctionRegistration.EnsureConnectionForDataset(groupCells[0].Config);
+                    string connName = DynamicFunctionRegistration.ConnectionNameForDataset(group.Key);
+                    string shortId = DynamicFunctionRegistration.ShortDatasetId(group.Key);
+                    string querySheetName = "__CC_Q_" + shortId + "__";   // <=31 chars
+                    string listObjName = "CC_QT_" + shortId;
+                    ProcessCellGroup(groupCells, connName, querySheetName, listObjName, ref totalProcessed, ref totalFailed);
                 }
 
                 // Step 7: Recalculate
@@ -268,6 +161,131 @@ namespace CubeConnector
             {
                 // Always restore calculation mode
                 xlApp.Calculation = originalCalcMode;
+            }
+        }
+
+        /// <summary>
+        /// Run the full pool analysis + pooled-execute + orphan pipeline for one dataset's cells.
+        /// connName/querySheetName/listObjName identify the per-dataset resources.
+        /// </summary>
+        private void ProcessCellGroup(List<RefreshItem> cellsToRefresh, string connName, string querySheetName, string listObjName, ref int totalProcessed, ref int totalFailed)
+        {
+            // Step 2: Analyze and create pools
+            var analysis = QueryPoolAnalyzer.AnalyzeQueries(cellsToRefresh, MIN_POOL_SIZE);
+
+            int pooledQueries = analysis.Pools.Sum(p => p.Items.Count);
+            int orphanQueries = analysis.Orphans.Count;
+
+            //MessageBox.Show($"Pool Analysis:\n\n" +
+            //    $"Pools created: {analysis.Pools.Count}\n" +
+            //    $"Queries in pools: {pooledQueries}\n" +
+            //    $"Orphan queries: {orphanQueries}\n\n" +
+            //    $"Building DAX queries...");
+
+            // Step 3: Build pooled queries and track which pools are in each query
+            var queryBatches = BuildPooledQueriesWithTracking(analysis.Pools, MAX_QUERY_LENGTH);
+
+            // DIAGNOSTIC: Show pool details
+            var poolDetails = string.Join("\n\n", analysis.Pools.Select((p, i) =>
+                $"Pool {i + 1}:\n" +
+                $"  Varying: Param{p.VaryingParamIndex}\n" +
+                $"  Fixed: {string.Join(", ", p.FixedParameters.Select(kvp => $"Param{kvp.Key}='{kvp.Value}'"))}\n" +
+                $"  Values: {p.VaryingValues.Count} items\n" +
+                $"  Queries: {p.Items.Count} formulas"
+            ));
+
+            //MessageBox.Show($"Pool Details:\n\n{poolDetails}");
+
+            //MessageBox.Show($"Built {queryBatches.Count} pooled DAX queries.\n\n" +
+            //    $"Query lengths:\n{string.Join("\n", queryBatches.Select((q, i) => $"Query {i + 1}: {q.DaxQuery.Length:N0} chars, {q.Pools.Count} pools"))}");
+
+            // Step 4: Copy first query to clipboard for testing (commented out)
+            //if (queryBatches.Count > 0)
+            //{
+            //    string firstQuery = queryBatches[0].DaxQuery;
+            //    Clipboard.SetText(firstQuery);
+            //    MessageBox.Show($"First pooled query copied to clipboard!\n\n" +
+            //        $"Length: {firstQuery.Length:N0} characters\n\n" +
+            //        $"You can now paste this into DAX Studio to test.\n\n" +
+            //        $"Preview (first 500 chars):\n{firstQuery.Substring(0, Math.Min(500, firstQuery.Length))}...");
+            //}
+
+            // Step 5: Execute pooled queries
+            for (int i = 0; i < queryBatches.Count; i++)
+            {
+                var batch = queryBatches[i];
+
+                try
+                {
+                    //MessageBox.Show($"Executing pooled query {i + 1}/{queryBatches.Count}...");
+
+                    var results = ExecuteBatchQuery(batch.DaxQuery, connName, querySheetName, listObjName);
+
+                    //MessageBox.Show($"Query returned {results.Count} results.\n\n" +
+                    //    $"Sample keys:\n{string.Join("\n", results.Keys.Take(5))}");
+
+                    // Get items from the pools in this batch
+                    var itemsInThisBatch = batch.Pools.SelectMany(p => p.Items).ToList();
+
+                    //MessageBox.Show($"Batch contains {batch.Pools.Count} pools:\n\n" +
+                    //    string.Join("\n", batch.Pools.Select((p, idx) =>
+                    //        $"Pool {idx + 1}: {p.Items.Count} items, " +
+                    //        $"Sample key: {p.Items.FirstOrDefault()?.CacheKey ?? "N/A"}"
+                    //    )));
+
+                    var itemsToStore = PrepareResultsForStorage(results, itemsInThisBatch);
+
+                    //MessageBox.Show($"Prepared {itemsToStore.Count} items for storage.\n\n" +
+                    //    $"Sample:\n{string.Join("\n", itemsToStore.Take(3).Select(kvp => $"{kvp.Key} = {kvp.Value.result}"))}");
+
+                    CacheManager.StoreBatch(workbook, itemsToStore);
+                    totalProcessed += itemsToStore.Count;
+
+                    //MessageBox.Show($"Pooled query {i + 1}/{queryBatches.Count} complete!\n" +
+                    //    $"Stored {itemsToStore.Count} results");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Pooled query {i + 1}/{queryBatches.Count} FAILED:\n\n{ex.Message}\n\n{ex.StackTrace}");
+                    totalFailed++;
+                }
+            }
+
+            // Step 6: Handle orphan queries with traditional batching
+            if (analysis.Orphans.Count > 0)
+            {
+                //MessageBox.Show($"Processing {analysis.Orphans.Count} orphan queries using traditional batching...");
+
+                var orphansByFunction = analysis.Orphans.GroupBy(o => o.Config.FunctionName);
+
+                foreach (var funcGroup in orphansByFunction)
+                {
+                    var config = funcGroup.First().Config;
+                    var batchItems = funcGroup.Select(item => new DAXQueryBuilder.BatchQueryItem
+                    {
+                        CacheKey = item.CacheKey,
+                        Parameters = item.Parameters
+                    }).ToList();
+
+                    try
+                    {
+                        string orphanQuery = DAXQueryBuilder.BuildBatchQuery(config, batchItems);
+
+                        //MessageBox.Show($"Orphan query for {funcGroup.Key}:\n\n{orphanQuery.Substring(0, Math.Min(1000, orphanQuery.Length))}...", "Debug Query");
+                        Clipboard.SetText(orphanQuery);  // Copy to clipboard so you can test in DAX Studio
+
+
+                        var results = ExecuteBatchQuery(orphanQuery, connName, querySheetName, listObjName);
+                        var itemsToStore = PrepareResultsForStorage(results, analysis.Orphans);
+                        CacheManager.StoreBatch(workbook, itemsToStore);
+                        totalProcessed += itemsToStore.Count;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Orphan batch failed for {funcGroup.Key}:\n\n{ex.Message}");
+                        totalFailed += funcGroup.Count();
+                    }
+                }
             }
         }
 
@@ -1067,7 +1085,7 @@ namespace CubeConnector
             return arguments;
         }
 
-        private Dictionary<string, object> ExecuteBatchQuery(string batchQuery)
+        private Dictionary<string, object> ExecuteBatchQuery(string batchQuery, string connName, string querySheetName, string listObjName)
         {
             var results = new Dictionary<string, object>();
 
@@ -1076,11 +1094,11 @@ namespace CubeConnector
                 Excel.WorkbookConnection conn;
                 try
                 {
-                    conn = workbook.Connections["CubeConnector"];
+                    conn = workbook.Connections[connName];
                 }
                 catch
                 {
-                    throw new Exception("Connection 'CubeConnector' not found.");
+                    throw new Exception("Connection '" + connName + "' not found.");
                 }
 
                 Excel.Worksheet querySheet;
@@ -1088,13 +1106,13 @@ namespace CubeConnector
 
                 try
                 {
-                    querySheet = workbook.Worksheets["__CubeConnector_Query__"];
-                    queryTable = querySheet.ListObjects["CubeConnector_QueryTable"];
+                    querySheet = workbook.Worksheets[querySheetName];
+                    queryTable = querySheet.ListObjects[listObjName];
                 }
                 catch
                 {
                     querySheet = workbook.Worksheets.Add();
-                    querySheet.Name = "__CubeConnector_Query__";
+                    querySheet.Name = querySheetName;
                     querySheet.Visible = Excel.XlSheetVisibility.xlSheetHidden;
 
                     Excel.OLEDBConnection oledbConn = conn.OLEDBConnection;
@@ -1107,7 +1125,7 @@ namespace CubeConnector
                         Destination: querySheet.Range["A1"]
                     );
 
-                    queryTable.Name = "CubeConnector_QueryTable";
+                    queryTable.Name = listObjName;
 
                     Excel.QueryTable qt = queryTable.QueryTable;
                     qt.CommandType = oledbConn.CommandType;
