@@ -92,6 +92,8 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Security" />
+    <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
@@ -158,6 +160,10 @@
     <Compile Include="ConfigurationStore.cs" />
     <Compile Include="DrillthroughManager.cs" />
     <Compile Include="DynamicFunctionRegistration.cs" />
+    <Compile Include="ModelIntrospector.cs" />
+    <Compile Include="PowerBiAuth.cs" />
+    <Compile Include="PowerBiRestClient.cs" />
+    <Compile Include="EnumerateModelsSmokeTest.cs" />
     <Compile Include="PivotManager.cs" />
     <Compile Include="QueryPoolAnalyzer.cs" />
     <Compile Include="RefreshManager.cs" />
@@ -214,4 +220,15 @@
     <Error Condition="!Exists('..\packages\ExcelDna.AddIn.1.9.0\build\ExcelDna.AddIn.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\ExcelDna.AddIn.1.9.0\build\ExcelDna.AddIn.targets'))" />
   </Target>
   <Import Project="..\packages\ExcelDna.AddIn.1.9.0\build\ExcelDna.AddIn.targets" Condition="Exists('..\packages\ExcelDna.AddIn.1.9.0\build\ExcelDna.AddIn.targets')" />
+  <!-- Deploy the out-of-process WAM helper into a subfolder beside the add-in,
+       matching production layout (PowerBiAuth looks for .\WamHelper\WamHelper.exe). -->
+  <Target Name="CopyWamHelper" AfterTargets="Build">
+    <ItemGroup>
+      <WamHelperFiles Include="$(MSBuildProjectDirectory)\..\WamHelper\bin\Release\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WamHelperFiles)"
+          DestinationFiles="@(WamHelperFiles->'$(OutDir)WamHelper\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(WamHelperFiles)' != ''" />
+  </Target>
 </Project>

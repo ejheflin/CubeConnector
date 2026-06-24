@@ -52,10 +52,14 @@ namespace CubeConnector
                                     label='Drill to Details' 
                                     onAction='OnDrillToDetailsClicked'
                                     imageMso='ControlWizards' />
-                            <button id='DrillToPivotBtn' 
-                                    label='Drill to Pivot' 
+                            <button id='DrillToPivotBtn'
+                                    label='Drill to Pivot'
                                     onAction='OnDrillToPivotClicked'
                                     imageMso='PivotTableInsert' />
+                            <button id='EnumerateModelsTestBtn'
+                                    label='Enumerate Models (TEST)'
+                                    onAction='OnEnumerateModelsClicked'
+                                    imageMso='ServerConnection' />
                         </menu>
                     </splitButton>
                 </group>
@@ -141,6 +145,12 @@ namespace CubeConnector
         {
             DynamicFunctionRegistration.DrillToPivotHandler();
         }
+
+        public void OnEnumerateModelsClicked(IRibbonControl control)
+        {
+            EnumerateModelsSmokeTest.RunEnumerateModelsSmokeTest();
+        }
+
         private static void EnsureConnectionExists()
         {
             DynamicFunctionRegistration.EnsureConnectionExists();

@@ -413,3 +413,9 @@ tmpclaude-*
 **/CubeConnectorConfig.json
 !**/CubeConnectorConfig.template.json
 !**/CubeConnectorConfig.example.json
+
+# CubeConnector dev scratch
+.superpowers/
+*_output.txt
+enumerate_smoketest.txt
+Example.xlsx

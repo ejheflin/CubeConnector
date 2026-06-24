@@ -1,0 +1,53 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-24-cubeconnector-wizard.md",
+  "tasks": [
+    {
+      "id": 11,
+      "subject": "Task 1: FunctionStore (per-user config CRUD, import/export, migration)",
+      "status": "pending",
+      "description": "Single class owning %LOCALAPPDATA%\\CubeConnector\\functions.json: load/save, CRUD, SanitizeName, Export, Import+merge, MigrateLegacyIfNeeded.\n\n```json:metadata\n{\"files\":[\"CubeConnector/FunctionStore.cs\",\"CubeConnector/CubeConnector.csproj\"],\"verifyCommand\":\"msbuild CubeConnector/CubeConnector.csproj /t:Rebuild\",\"acceptanceCriteria\":[\"GetAll/Save/Delete\",\"SanitizeName\",\"Export\",\"Import+merge\",\"MigrateLegacyIfNeeded\"]}\n```"
+    },
+    {
+      "id": 12,
+      "subject": "Task 2: Repoint ConfigurationStore to FunctionStore + migration",
+      "status": "pending",
+      "blockedBy": [11],
+      "description": "AutoOpen reads per-user file via FunctionStore; legacy migrates once.\n\n```json:metadata\n{\"files\":[\"CubeConnector/ConfigurationStore.cs\",\"CubeConnector/DynamicFunctionRegistration.cs\"],\"verifyCommand\":\"msbuild + manual Excel\",\"acceptanceCriteria\":[\"GetAllConfigs via FunctionStore\",\"migration at AutoOpen\",\"functions register\"]}\n```"
+    },
+    {
+      "id": 13,
+      "subject": "Task 3: Silent executeQueries introspection + ModelMetadata DTO",
+      "status": "pending",
+      "description": "Read model tables/columns/measures silently via REST executeQueries; shared ModelMetadata DTO; ModelIntrospector fallback used by bridge.\n\n```json:metadata\n{\"files\":[\"CubeConnector/ModelMetadata.cs\",\"CubeConnector/PowerBiRestClient.cs\",\"CubeConnector/CubeConnector.csproj\"],\"verifyCommand\":\"msbuild\",\"acceptanceCriteria\":[\"ExecuteQueriesIntrospect\",\"RowNumber filtered\",\"error throws with body\"]}\n```"
+    },
+    {
+      "id": 14,
+      "subject": "Task 4: WizardBridge (JSON facade)",
+      "status": "pending",
+      "blockedBy": [11, 13],
+      "description": "COM-visible JSON-in/JSON-out facade for the UI over auth/REST/introspection/store.\n\n```json:metadata\n{\"files\":[\"CubeConnector/WizardBridge.cs\",\"CubeConnector/PowerBiAuth.cs\",\"CubeConnector/CubeConnector.csproj\"],\"verifyCommand\":\"msbuild\",\"acceptanceCriteria\":[\"all bridge methods\",\"{error} envelope\",\"GetModel fallback\"]}\n```"
+    },
+    {
+      "id": 15,
+      "subject": "Task 5: WizardWindow + WebView2 host + ribbon button",
+      "status": "pending",
+      "blockedBy": [14],
+      "description": "Ribbon 'Manage Formulas' opens WinForms window hosting WebView2 mapped to ui/ folder with bridge registered; remove smoke-test.\n\n```json:metadata\n{\"files\":[\"CubeConnector/WizardWindow.cs\",\"CubeConnector/CubeConnectorRibbon.cs\",\"CubeConnector/CubeConnector.csproj\"],\"verifyCommand\":\"msbuild + manual\",\"acceptanceCriteria\":[\"button opens window\",\"ui loads\",\"bridge reachable\",\"missing-runtime message\",\"smoke-test removed\"]}\n```"
+    },
+    {
+      "id": 16,
+      "subject": "Task 6: Wizard UI (library, import, builder)",
+      "status": "pending",
+      "blockedBy": [14, 15],
+      "description": "HTML/CSS/JS UI evolved from docs/index.html calling the bridge; plain-language labels + ? helpers; consumer Import hero; builder + live preview.\n\n```json:metadata\n{\"files\":[\"CubeConnector/ui/index.html\",\"CubeConnector/ui/app.js\",\"CubeConnector/ui/styles.css\"],\"verifyCommand\":\"manual E2E\",\"acceptanceCriteria\":[\"library\",\"import flow\",\"builder 4 sections\",\"plain labels+helpers\",\"preview\",\"save->library\"]}\n```"
+    },
+    {
+      "id": 17,
+      "subject": "Task 7: End-to-end verification + remove dev self-check",
+      "status": "pending",
+      "blockedBy": [16],
+      "description": "Prove the full create->save->restart->use loop and import/export; remove dev-only SelfCheck.\n\n```json:metadata\n{\"files\":[\"CubeConnector/WizardBridge.cs\"],\"verifyCommand\":\"manual E2E + msbuild\",\"acceptanceCriteria\":[\"create+restart+resolves\",\"export/import both policies\",\"account switch\",\"SelfCheck removed\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-24"
+}
