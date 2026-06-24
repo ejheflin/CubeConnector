@@ -133,6 +133,84 @@ namespace CubeConnector
                       .ToList();
         }
 
+        // ---- executeQueries introspection ----
+
+        public static ModelMetadata ExecuteQueriesIntrospect(string accessToken, string groupId, string datasetId)
+        {
+            string baseUrl = string.IsNullOrEmpty(groupId)
+                ? PbiApi + "/datasets/" + datasetId + "/executeQueries"
+                : PbiApi + "/groups/" + groupId + "/datasets/" + datasetId + "/executeQueries";
+
+            var md = new ModelMetadata();
+            foreach (var r in RunDax(accessToken, baseUrl, "EVALUATE INFO.VIEW.TABLES()"))
+                md.Tables.Add(Val(r, "Name"));
+            foreach (var r in RunDax(accessToken, baseUrl, "EVALUATE INFO.VIEW.COLUMNS()"))
+            {
+                string type = Val(r, "Type"); string cat = Val(r, "DataCategory");
+                if (type == "RowNumber" || cat == "RowNumber") continue;
+                md.Columns.Add(new ModelColumn { Table = Val(r, "Table"), Name = Val(r, "Name"),
+                    DataType = Val(r, "DataType"), IsHidden = Val(r, "IsHidden") == "True" });
+            }
+            foreach (var r in RunDax(accessToken, baseUrl, "EVALUATE INFO.VIEW.MEASURES()"))
+                md.Measures.Add(new ModelMeasure { Table = Val(r, "Table"), Name = Val(r, "Name") });
+            return md;
+        }
+
+        // executeQueries returns results[0].tables[0].rows: [{ "INFO.VIEW.COLUMNS()[Name]": val, ... }]
+        private static List<Dictionary<string,string>> RunDax(string token, string url, string dax)
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            var req = (HttpWebRequest)WebRequest.Create(url);
+            req.Method = "POST"; req.ContentType = "application/json";
+            req.Headers["Authorization"] = "Bearer " + token; req.Accept = "application/json";
+            string body = "{\"queries\":[{\"query\":\"" + dax.Replace("\"","\\\"") + "\"}],"
+                + "\"serializerSettings\":{\"includeNulls\":true}}";
+            byte[] data = Encoding.UTF8.GetBytes(body);
+            req.ContentLength = data.Length;
+            using (var rs = req.GetRequestStream()) rs.Write(data, 0, data.Length);
+
+            string resp;
+            try { using (var r = (HttpWebResponse)req.GetResponse())
+                  using (var sr = new StreamReader(r.GetResponseStream())) resp = sr.ReadToEnd(); }
+            catch (WebException wex) when (wex.Response is HttpWebResponse er)
+            { using (var sr = new StreamReader(er.GetResponseStream()))
+                throw new InvalidOperationException("executeQueries failed (" + (int)er.StatusCode + "): " + sr.ReadToEnd()); }
+
+            return ParseRows(resp);
+        }
+
+        // Minimal parse of results[0].tables[0].rows using JavaScriptSerializer.
+        private static List<Dictionary<string,string>> ParseRows(string json)
+        {
+            var ser = new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+            var root = (Dictionary<string,object>)ser.DeserializeObject(json);
+            var rows = new List<Dictionary<string,string>>();
+            var results = root.TryGetValue("results", out var ro) ? ro as object[] : null;
+            if (results == null || results.Length == 0) return rows;
+            var res0 = (Dictionary<string,object>)results[0];
+            var tables = res0.TryGetValue("tables", out var to) ? to as object[] : null;
+            if (tables == null || tables.Length == 0) return rows;
+            var t0 = (Dictionary<string,object>)tables[0];
+            var rowArr = t0.TryGetValue("rows", out var rr) ? rr as object[] : null;
+            if (rowArr == null) return rows;
+            foreach (Dictionary<string,object> row in rowArr.Cast<Dictionary<string,object>>())
+            {
+                var d = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in row)
+                {
+                    // keys look like "[Name]" or "Table[Name]" or "INFO.VIEW.COLUMNS()[Name]" -> take inside last [ ]
+                    string key = kv.Key; int lb = key.LastIndexOf('['), rb = key.LastIndexOf(']');
+                    if (lb >= 0 && rb > lb) key = key.Substring(lb + 1, rb - lb - 1);
+                    d[key] = kv.Value?.ToString() ?? "";
+                }
+                rows.Add(d);
+            }
+            return rows;
+        }
+
+        private static string Val(Dictionary<string,string> row, string key)
+            => row.TryGetValue(key, out var v) ? v : "";
+
         // ---- HTTP / JSON ----
 
         private static T GetJson<T>(string url, string bearer) where T : class
