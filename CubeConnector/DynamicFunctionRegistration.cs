@@ -42,9 +42,10 @@ namespace CubeConnector
         // Static reference to Excel Application for cache access
         public static Microsoft.Office.Interop.Excel.Application ExcelApp { get; private set; }
 
-        // Track which function names have been registered so we can detect removals
-        private static readonly System.Collections.Generic.HashSet<string> _registeredNames =
-            new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+        // Track registered function name -> parameter count (arity), to detect new / removed /
+        // arity-changed functions across a runtime reload.
+        private static readonly System.Collections.Generic.Dictionary<string, int> _registeredArity =
+            new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
 
         public void AutoOpen()  // NOT static anymore
         {
@@ -59,7 +60,7 @@ namespace CubeConnector
                 if (configs == null || configs.Count == 0) return;
 
                 RegisterFunctionsFromConfig(configs);
-                foreach (var c in configs) _registeredNames.Add(c.FunctionName);
+                foreach (var c in configs) _registeredArity[c.FunctionName] = c.Parameters?.Count ?? 0;
                 AddContextMenuItems();
             }
             catch (Exception ex)
@@ -76,15 +77,35 @@ namespace CubeConnector
         {
             ConfigurationStore.Invalidate();
             var configs = ConfigurationStore.GetAllConfigs() ?? new System.Collections.Generic.List<UDFConfig>();
-            RegisterFunctionsFromConfig(configs);
-            var current = new System.Collections.Generic.HashSet<string>(
-                configs.ConvertAll(c => c.FunctionName), System.StringComparer.OrdinalIgnoreCase);
-            bool removed = false;
-            foreach (var prev in _registeredNames)
-                if (!current.Contains(prev)) { removed = true; break; }
-            _registeredNames.Clear();
-            foreach (var n in current) _registeredNames.Add(n);
-            return new ReloadResult { Reloaded = configs.Count, RemovedNeedRestart = removed };
+
+            // Excel-DNA can register NEW functions at runtime, but only from a macro context
+            // (xlfRegister), and it cannot unregister or change the arity of one already
+            // registered. So: register only the new ones (via QueueAsMacro); a removal or an
+            // arity change requires a restart. A same-arity edit needs nothing here — the
+            // delegate reads fresh config at call time and we already invalidated the cache.
+            var newConfigs = new System.Collections.Generic.List<UDFConfig>();
+            var currentNames = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            bool needRestart = false;
+
+            foreach (var c in configs)
+            {
+                currentNames.Add(c.FunctionName);
+                int arity = c.Parameters?.Count ?? 0;
+                if (!_registeredArity.TryGetValue(c.FunctionName, out int prevArity))
+                    newConfigs.Add(c);                 // brand new -> register live
+                else if (prevArity != arity)
+                    needRestart = true;                // arity changed -> old signature lingers until restart
+            }
+            foreach (var prev in _registeredArity.Keys)
+                if (!currentNames.Contains(prev)) { needRestart = true; break; }  // removed -> lingers until restart
+
+            if (newConfigs.Count > 0)
+                ExcelAsyncUtil.QueueAsMacro(() => RegisterFunctionsFromConfig(newConfigs));
+
+            _registeredArity.Clear();
+            foreach (var c in configs) _registeredArity[c.FunctionName] = c.Parameters?.Count ?? 0;
+
+            return new ReloadResult { Reloaded = configs.Count, RemovedNeedRestart = needRestart };
         }
 
         public void AutoClose()
