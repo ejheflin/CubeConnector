@@ -1,0 +1,11 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>CubeConnector</title></head>
+<body style="font-family:sans-serif;padding:20px">
+<h2>CubeConnector</h2>
+<p id="acct">Loading account…</p>
+<script>
+(async () => {
+  try { const r = JSON.parse(await window.chrome.webview.hostObjects.cc.GetAccount());
+        document.getElementById('acct').textContent = r.error ? ('Error: '+r.error) : ('Signed in: '+(r.upn||'(unknown)')); }
+  catch (e) { document.getElementById('acct').textContent = 'Bridge error: ' + e; }
+})();
+</script></body></html>
