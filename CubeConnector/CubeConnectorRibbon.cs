@@ -152,6 +152,10 @@ namespace CubeConnector
         {
             try
             {
+                // Start the dataset prefetch the instant the button is clicked, so the model
+                // list is ready by the time the user reaches the dropdown (idempotent + guarded).
+                System.Threading.Tasks.Task.Run(() => PowerBiRestClient.WarmDatasetCache());
+
                 if (_pane == null)
                 {
                     _pane = ExcelDna.Integration.CustomUI.CustomTaskPaneFactory.CreateCustomTaskPane(

@@ -33,14 +33,22 @@ async function newFunction(){
   showEditor(); await loadModels(); document.getElementById('friendlyName').value=''; renderFilters(); renderPreview();
 }
 
-async function loadModels(){
+async function loadModels(preselectId){
   const sel = document.getElementById('modelSelect'); sel.innerHTML = '<option>Loading…</option>';
   const o = await call(cc.ListDatasets());
   sel.innerHTML='';
   (o.datasets||[]).forEach(d => { const opt=document.createElement('option');
     opt.value = JSON.stringify({id:d.Id, group:d.WorkspaceId, name:d.Name});
     opt.textContent = (d.WorkspaceName||'') + ' ▸ ' + d.Name; sel.appendChild(opt); });
-  if (sel.options.length) await onModelChange();
+  if (sel.options.length) {
+    // When editing, pre-select the formula's saved model so we don't silently re-point it.
+    if (preselectId) {
+      for (const opt of sel.options) {
+        try { if (JSON.parse(opt.value).id === preselectId) { sel.value = opt.value; break; } } catch(_){}
+      }
+    }
+    await onModelChange();
+  }
 }
 
 async function onModelChange(){
@@ -134,8 +142,13 @@ async function editFunction(name){
   const o = await call(cc.GetFunctions());
   const f = (o.functions||[]).find(x=>x.FunctionName===name); if(!f) return;
   CURRENT = JSON.parse(JSON.stringify(f)); CURRENT._group='';
-  showEditor(); await loadModels();
-  // best-effort select existing dataset; then set name/measure
+  showEditor();
+  // Pre-select the saved model (loads its measures/fields and restores ModelName/DatasetId).
+  await loadModels(f.DatasetId);
+  // Restore the saved measure selection (measureSelect option values are bare names).
+  const measName = (f.MeasureName||'').replace(/^\[|\]$/g,'');
+  const ms = document.getElementById('measureSelect');
+  for (const opt of ms.options) { if (opt.value === measName) { ms.value = measName; break; } }
   document.getElementById('friendlyName').value = name.replace(/^CC\./,'');
   // collapse RangeStart/RangeEnd pairs back to one 'range' filter for editing
   const collapsed=[]; (f.Parameters||[]).forEach(p=>{ if(p.FilterType==='RangeEnd')return;
