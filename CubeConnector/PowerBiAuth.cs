@@ -165,6 +165,23 @@ namespace CubeConnector
             catch { return null; }
         }
 
+        /// <summary>
+        /// Extract the tenant id (tid claim) from a Power BI access token (a JWT).
+        /// Returns "common" if not extractable. No signature validation -- display/routing only.
+        /// </summary>
+        public static string GetTidFromTokenPublic(string token)
+        {
+            try {
+                var parts = (token ?? "").Split('.');
+                if (parts.Length < 2) return "common";
+                string p = parts[1].Replace('-', '+').Replace('_', '/');
+                switch (p.Length % 4) { case 2: p += "=="; break; case 3: p += "="; break; }
+                string json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(p));
+                var m = System.Text.RegularExpressions.Regex.Match(json, "\"tid\"\\s*:\\s*\"([^\"]*)\"");
+                return m.Success ? m.Groups[1].Value : "common";
+            } catch { return "common"; }
+        }
+
         /// <summary>Delete the cached refresh token (forces interactive sign-in next time).</summary>
         public static void SignOut()
         {
