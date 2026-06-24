@@ -40,7 +40,7 @@ namespace CubeConnector
             try {
                 string token = PowerBiAuth.GetAccessToken(out _, out string err);
                 if (token == null) return J.Serialize(new { error = err ?? "sign-in failed" });
-                var ds = PowerBiRestClient.GetAllDatasets(token)
+                var ds = PowerBiRestClient.GetAllDatasetsCached(token)
                     .Select(d => new { d.Id, d.Name, d.WorkspaceId, d.WorkspaceName, d.IsRefreshable }).ToList();
                 return Ok(new { datasets = ds });
             } catch (Exception e) { return Err(e); }

@@ -146,9 +146,29 @@ namespace CubeConnector
             DynamicFunctionRegistration.DrillToPivotHandler();
         }
 
+        private static ExcelDna.Integration.CustomUI.CustomTaskPane _pane;
+
         public void OnManageFormulasClicked(IRibbonControl control)
         {
-            WizardWindow.ShowSingleton();
+            try
+            {
+                if (_pane == null)
+                {
+                    _pane = ExcelDna.Integration.CustomUI.CustomTaskPaneFactory.CreateCustomTaskPane(
+                        typeof(WizardPaneControl), "CubeConnector");
+                    _pane.DockPosition = ExcelDna.Integration.CustomUI.MsoCTPDockPosition.msoCTPDockPositionRight;
+                    _pane.Width = 440;
+                }
+                _pane.Visible = !_pane.Visible;
+            }
+            catch (Exception ex)
+            {
+                // Fallback to the popup window if the CTP is unavailable in this host.
+                System.Windows.Forms.MessageBox.Show(
+                    "Task pane unavailable, opening window instead.\n\n" + ex.Message,
+                    "CubeConnector");
+                WizardWindow.ShowSingleton();
+            }
         }
 
         private static void EnsureConnectionExists()

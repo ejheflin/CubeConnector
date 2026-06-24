@@ -175,6 +175,7 @@
     <Compile Include="PowerBiAuth.cs" />
     <Compile Include="PowerBiRestClient.cs" />
     <Compile Include="WizardBridge.cs" />
+    <Compile Include="WizardPaneControl.cs" />
     <Compile Include="WizardWindow.cs" />
     <Compile Include="PivotManager.cs" />
     <Compile Include="QueryPoolAnalyzer.cs" />

@@ -42,6 +42,37 @@ namespace CubeConnector
     {
         private const string PbiApi = "https://api.powerbi.com/v1.0/myorg";
 
+        // ---- in-memory dataset cache (prefetch on pane open) ----
+
+        private static volatile List<DatasetInfo> _cache;
+
+        /// <summary>
+        /// Best-effort silent prefetch: if a token is already available (WAM/cached),
+        /// populate the dataset cache in the background so the UI dropdown is instant.
+        /// Safe to call from a background thread; silently swallows any error.
+        /// </summary>
+        public static void WarmDatasetCache()
+        {
+            try
+            {
+                string token = PowerBiAuth.GetAccessToken(out _, out _); // silent path if available
+                if (!string.IsNullOrEmpty(token))
+                    _cache = GetAllDatasets(token);
+            }
+            catch { /* prefetch is best-effort — never surface errors here */ }
+        }
+
+        /// <summary>
+        /// Returns all datasets, using the in-memory cache when it has been warmed,
+        /// otherwise falls through to the live REST call.
+        /// </summary>
+        public static List<DatasetInfo> GetAllDatasetsCached(string accessToken)
+        {
+            if (_cache != null) return _cache;
+            _cache = GetAllDatasets(accessToken);
+            return _cache;
+        }
+
         // ---- DataContract response shapes ----
 
         [DataContract]
