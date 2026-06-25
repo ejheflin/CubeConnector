@@ -343,11 +343,9 @@ namespace CubeConnector
             detailsButton.Caption = "CubeConnector - Drill to Details";
             detailsButton.OnAction = "DrillToDetailsHandler";
 
-            // Add "Drill to Pivot"
-            var pivotButton = (Microsoft.Office.Core.CommandBarButton)
-                cellMenu.Controls.Add(Type: Microsoft.Office.Core.MsoControlType.msoControlButton, Temporary: true);
-            pivotButton.Caption = "CubeConnector - Drill to Pivot";
-            pivotButton.OnAction = "DrillToPivotHandler";
+            // "Drill to Pivot" temporarily removed pending further testing. The delete
+            // calls above still run so any stale item from a prior version is cleaned up.
+            // Re-add the button here (and the ribbon button in CubeConnectorRibbon) to re-enable.
 
             // Add "Refresh"
             var refreshButton = (Microsoft.Office.Core.CommandBarButton)

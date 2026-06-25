@@ -52,10 +52,9 @@ namespace CubeConnector
                                     label='Drill to Details' 
                                     onAction='OnDrillToDetailsClicked'
                                     imageMso='ControlWizards' />
-                            <button id='DrillToPivotBtn'
-                                    label='Drill to Pivot'
-                                    onAction='OnDrillToPivotClicked'
-                                    imageMso='PivotTableInsert' />
+                            <!-- Drill to Pivot temporarily removed pending further testing.
+                                 Restore this button (and the context-menu item in
+                                 DynamicFunctionRegistration.AddContextMenuItems) to re-enable. -->
                             <button id='ManageFormulasBtn'
                                     label='Manage Formulas'
                                     onAction='OnManageFormulasClicked'
