@@ -171,6 +171,7 @@
     <Compile Include="DrillthroughManager.cs" />
     <Compile Include="DynamicFunctionRegistration.cs" />
     <Compile Include="ModelMetadata.cs" />
+    <Compile Include="OfficeTheme.cs" />
     <Compile Include="ModelIntrospector.cs" />
     <Compile Include="PowerBiAuth.cs" />
     <Compile Include="PowerBiRestClient.cs" />

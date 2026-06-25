@@ -152,21 +152,13 @@ function addFilter(){
 function renderFilters(){
   const wrap = $('filterList'); wrap.innerHTML='';
   const cols = MODEL.columns || [];
-  // group columns by table for the field <select>
-  const byTable = {};
-  cols.forEach(c => { (byTable[c.Table]=byTable[c.Table]||[]).push(c); });
+  // field options grouped by table, for the searchable field picker
+  const fieldItems = cols.map(c => ({ value:`${c.Table}||${c.Name}||${c.DataType}`, label:c.Name, group:c.Table }));
   CURRENT.Parameters.filter(p=>!p._isEnd).forEach(p=>{
     const idx = CURRENT.Parameters.indexOf(p);
-    let optsHtml = '<option value="">choose a field…</option>';
-    Object.keys(byTable).forEach(t=>{
-      optsHtml += `<optgroup label="${esc(t)}">`;
-      byTable[t].forEach(c=>{ const sel = (p.TableName===c.Table && p.FieldName===c.Name)?'selected':'';
-        optsHtml += `<option value="${esc(c.Table)}||${esc(c.Name)}||${esc(c.DataType)}" ${sel}>${esc(c.Name)}</option>`; });
-      optsHtml += '</optgroup>';
-    });
     const card = document.createElement('div'); card.className='filter-card';
     card.innerHTML =
-      `<div class="row"><select class="field" onchange="setField(${idx}, this.value)">${optsHtml}</select>
+      `<div class="row"><div class="fieldcombo" style="flex:1"></div>
          <button class="icon-btn" title="Remove" onclick="removeFilter(${idx})">✕</button></div>
        <div class="row">
          <span class="seg">
@@ -176,6 +168,12 @@ function renderFilters(){
          <input class="field" style="flex:1" placeholder="filter name" value="${esc(p.Name||'')}" oninput="setName(${idx}, this.value)">
        </div>`;
     wrap.appendChild(card);
+    const combo = Combo(card.querySelector('.fieldcombo'), {
+      placeholder:'choose a field…', searchPlaceholder:'Search fields…', grouped:true,
+      onSelect:(v)=>setField(idx, v)
+    });
+    combo.setItems(fieldItems);
+    if(p.TableName && p.FieldName) combo.setValueLabel(`${p.TableName}||${p.FieldName}||${p.DataType}`, p.FieldName);
   });
 }
 function setField(i,v){ const [t,f,dt]=v.split('||'); const p=CURRENT.Parameters[i]; p.TableName=t; p.FieldName=f;
