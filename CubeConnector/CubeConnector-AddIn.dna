@@ -1,5 +1,7 @@
 <DnaLibrary Name="CubeConnector" RuntimeVersion="v4.0">
 	<ExternalLibrary Path="CubeConnector.dll" ExplicitExports="false" LoadFromBytes="true" Pack="true" />
+	<ExternalLibrary Path="Microsoft.Web.WebView2.Core.dll" LoadFromBytes="true" Pack="true" />
+	<ExternalLibrary Path="Microsoft.Web.WebView2.WinForms.dll" LoadFromBytes="true" Pack="true" />
 
 	<!-- Enable logging -->
 	<Property Name="LogDisplay" Value="True" />
