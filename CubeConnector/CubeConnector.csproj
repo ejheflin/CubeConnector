@@ -177,6 +177,7 @@
     <Compile Include="PowerBiRestClient.cs" />
     <Compile Include="WizardBridge.cs" />
     <Compile Include="UiHost.cs" />
+    <Compile Include="RuntimeBootstrap.cs" />
     <Compile Include="WizardPaneControl.cs" />
     <Compile Include="WizardWindow.cs" />
     <Compile Include="PivotManager.cs" />
@@ -222,6 +223,11 @@
     <EmbeddedResource Include="ui\app.js" />
     <EmbeddedResource Include="ui\styles.css" />
     <EmbeddedResource Include="ui\cubeconnectorlogo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\packages\Microsoft.Web.WebView2.1.0.4022.49\runtimes\win-x64\native\WebView2Loader.dll">
+      <LogicalName>CubeConnector.native.WebView2Loader.dll</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Content Include="connectionstring.png" />

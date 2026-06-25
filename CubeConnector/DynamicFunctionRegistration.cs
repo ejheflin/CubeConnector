@@ -51,6 +51,7 @@ namespace CubeConnector
         {
             try
             {
+                RuntimeBootstrap.EnsureWebView2Loader();
                 FunctionStore.MigrateLegacyIfNeeded();
 
                 // Store Excel Application reference for cache access
