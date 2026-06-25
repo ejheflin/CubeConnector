@@ -143,11 +143,15 @@ Edit the `CubeConnectorConfig.json` file directly in the same directory as the `
 
 ### Excel Installation
 
-**Simple setup - no traditional install required:**
+**Simple setup — no traditional installer required:**
 
-1. In Excel, go to File → Options → Add-ins → Manage Excel Add-ins → Browse
-2. Select the `CubeConnector.xll` file from the downloaded directory
-3. Click OK to enable the add-in
+1. Download `CubeConnector.zip` from the [Releases](../../releases) page and extract it. Keep `CubeConnector.xll` and `WebView2Loader.dll` **together in the same folder**.
+2. **Unblock the file** (one-time, required for files downloaded from the internet): right-click `CubeConnector.xll` → **Properties** → check **Unblock** → **OK**. If you skip this, Excel may silently refuse to load the add-in.
+3. In Excel: **File → Options → Add-ins → Manage: Excel Add-ins → Go… → Browse…**, select `CubeConnector.xll`, and click **OK**.
+
+The add-in loads on the next launch — you'll see the **CubeConnector** group on the **Data** tab.
+
+**Optional — instant (zero-click) sign-in:** by default CubeConnector signs in via a one-time browser prompt. If you'd like silent single sign-on and your environment permits running helper executables, download the optional **zero-click SSO add-on** and drop the `WamHelper\` folder next to `CubeConnector.xll`.
 
 ### Basic Usage
 
