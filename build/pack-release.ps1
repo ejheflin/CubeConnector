@@ -16,4 +16,13 @@ $zip = Join-Path $out "CubeConnector.zip"
 Remove-Item $zip -Force -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip
 Write-Host "Built $zip"
+
+# Single-file mode: also emit the bare, directly-loadable .xll (no extraction needed).
+$bareXll = Join-Path $out "CubeConnector.xll"
+Remove-Item $bareXll -Force -ErrorAction SilentlyContinue
+if ($SingleFile) {
+    Copy-Item (Join-Path $stage "CubeConnector.xll") $bareXll
+    Write-Host "Built $bareXll (single-file)"
+}
+
 Get-ChildItem $stage | Select-Object Name, Length | Format-Table | Out-String | Write-Host
