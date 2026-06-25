@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CubeConnector</title>
+  <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <div class="account"><span class="dot"></span><span id="account">Loading…</span>
+      <button onclick="switchAccount()">Switch account</button></div>
+
+    <div id="restart" class="banner restart">Deleted formulas stay until you close and reopen Excel.</div>
+    <div id="status" class="banner status"></div>
+
+    <!-- LIBRARY -->
+    <section id="libraryView">
+      <h2 class="title">Your formulas</h2>
+      <div class="toolbar">
+        <button class="btn primary" onclick="newFunction()">+ New formula</button>
+        <button class="btn" onclick="doImport()">Import shared</button>
+        <button class="btn" onclick="doExport()">Export</button>
+        <button class="btn ghost" onclick="reloadIntoExcel()">Reload into Excel</button>
+      </div>
+      <div id="functionList" class="func-list"></div>
+    </section>
+
+    <!-- EDITOR -->
+    <section id="editorView" style="display:none">
+      <div class="back" onclick="showLibrary()">‹ Back to your formulas</div>
+
+      <div class="label"><span class="step">1</span> What data?
+        <span class="opt">(model)</span>
+        <span class="helper" title="The Power BI dataset your formula pulls from. Pick the one that has the numbers you need.">?</span>
+      </div>
+      <div id="modelCombo"></div>
+
+      <div class="label"><span class="step">2</span> The number you want
+        <span class="opt">(measure)</span>
+        <span class="helper" title="A ready-made calculation in your data, like Net Amount or Total Volume. Pick the one this formula returns.">?</span>
+      </div>
+      <div id="measureCombo"></div>
+
+      <div class="label"><span class="step">3</span> Let people filter by
+        <span class="opt">optional</span>
+        <span class="helper" title="A filter lets whoever uses the formula narrow the result — e.g. to an account or a date range.">?</span>
+      </div>
+      <div id="filterList" class="filter-list"></div>
+      <button class="btn ghost" style="margin-top:8px" onclick="addFilter()">+ Add a filter</button>
+
+      <div class="label"><span class="step">4</span> Name it</div>
+      <input id="friendlyName" class="field" placeholder="e.g. Net Amount" oninput="renderPreview()">
+      <div id="nameHint" class="hint"></div>
+
+      <div class="formula-bar">
+        <div class="fx-row">
+          <div class="fx">fx</div>
+          <div id="formula" class="formula"></div>
+        </div>
+        <div class="explain">
+          <div id="explain"></div>
+          <div id="example" class="example"></div>
+        </div>
+      </div>
+
+      <button class="btn primary block" style="margin-top:14px" onclick="saveFunction()">Save formula</button>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

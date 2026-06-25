@@ -433,15 +433,16 @@ namespace CubeConnector
         {
             try
             {
-                // Get the existing connection to extract connection details
+                // Get the existing connection for this cell's dataset to extract connection details
                 Excel.WorkbookConnection existingConn;
                 try
                 {
-                    existingConn = workbook.Connections["CubeConnector"];
+                    DynamicFunctionRegistration.EnsureConnectionForDataset(item.Config);
+                    existingConn = workbook.Connections[DynamicFunctionRegistration.ConnectionNameForDataset(item.Config)];
                 }
                 catch
                 {
-                    throw new Exception("Connection 'CubeConnector' not found.");
+                    throw new Exception("Connection '" + DynamicFunctionRegistration.ConnectionNameForDataset(item.Config) + "' not found.");
                 }
 
                 // Extract connection string
@@ -450,7 +451,9 @@ namespace CubeConnector
                 // Generate unique names
                 string baseName = $"Pivot - {item.Config.FunctionName}";
                 string sheetName = GetUniqueSheetName(baseName);
-                string pivotConnName = $"PivotConn_{Guid.NewGuid().ToString().Substring(0, 8)}";
+                string modelLabel = new string((item.Config.ModelName ?? "").Where(ch => char.IsLetterOrDigit(ch) || ch == ' ' || ch == '-' || ch == '_').ToArray()).Trim();
+                if (modelLabel.Length == 0) modelLabel = "CubeConnector";
+                string pivotConnName = modelLabel + " Pivot " + Guid.NewGuid().ToString().Substring(0, 8);
 
                 // Create new sheet
                 Excel.Worksheet pivotSheet = workbook.Worksheets.Add();
@@ -1118,11 +1121,14 @@ namespace CubeConnector
                     }
                 }
 
-                // Get the connection
+                // Get the connection for the first configured dataset
+                var firstConfig = ConfigurationStore.GetAllConfigs().FirstOrDefault();
+                if (firstConfig == null) return;
                 Excel.WorkbookConnection existingConn;
                 try
                 {
-                    existingConn = workbook.Connections["CubeConnector"];
+                    DynamicFunctionRegistration.EnsureConnectionForDataset(firstConfig);
+                    existingConn = workbook.Connections[DynamicFunctionRegistration.ConnectionNameForDataset(firstConfig)];
                 }
                 catch
                 {

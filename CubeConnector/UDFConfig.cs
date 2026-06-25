@@ -32,6 +32,7 @@ namespace CubeConnector
         public string TenantId { get; set; }
         public string DatasetPrefix { get; set; }
         public string DatasetId { get; set; }
+        public string ModelName { get; set; }
         public string MeasureName { get; set; }
         public List<ParameterConfig> Parameters { get; set; }
 

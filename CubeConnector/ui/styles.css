@@ -1,0 +1,200 @@
+/* CubeConnector wizard — calm, native-Office look with an Excel "formula bar" signature.
+   Light + dark via prefers-color-scheme (WebView2 follows the OS/Office theme). */
+
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --surface-2: #FBFCFD;
+  --ink: #18222E;
+  --muted: #6B7787;
+  --faint: #94A1B0;
+  --line: #E6E9EE;
+  --line-strong: #D4DAE2;
+  --accent: #6E56E6;
+  --accent-ink: #5238C9;
+  --accent-soft: #ECE9FC;
+  --grad-a: #5BC4F0;   /* CubeConnector logo: cyan */
+  --grad-b: #B06FE6;   /* CubeConnector logo: violet */
+  --amber: #B45309;
+  --danger: #B42318;
+  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 6px 16px rgba(16,24,40,.06);
+  --shadow-pop: 0 8px 28px rgba(16,24,40,.16);
+  --radius: 10px;
+  --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0F1419;
+    --surface: #1A222B;
+    --surface-2: #161D25;
+    --ink: #E7ECF1;
+    --muted: #9AA7B4;
+    --faint: #6E7C8A;
+    --line: #2A333D;
+    --line-strong: #38434F;
+    --accent: #9B87F5;
+    --accent-ink: #B9A8FF;
+    --accent-soft: #241F3D;
+    --grad-a: #57B6E6;
+    --grad-b: #A86FE0;
+    --amber: #E0A44A;
+    --danger: #F0857A;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.35);
+    --shadow-pop: 0 10px 30px rgba(0,0,0,.55);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; }
+body {
+  font-family: var(--ui);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+#app { padding: 14px 14px 28px; max-width: 560px; margin: 0 auto; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 8px; border: 2px solid var(--bg); }
+
+/* header / account */
+.account {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+  padding-bottom: 10px;
+}
+.account .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.account button {
+  margin-left: auto; font: inherit; font-size: 12px; color: var(--accent-ink);
+  background: none; border: none; cursor: pointer; padding: 2px 4px; border-radius: 6px;
+}
+.account button:hover { background: var(--accent-soft); }
+
+h2.title { font-size: 17px; font-weight: 650; letter-spacing: -.02em; margin-bottom: 12px; }
+
+/* banners */
+.banner { border-radius: var(--radius); padding: 10px 12px; font-size: 12.5px; margin: 10px 0; display: none; }
+.banner.restart { background: color-mix(in srgb, var(--amber) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--line)); color: var(--amber); }
+.banner.status  { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); color: var(--accent-ink); }
+
+/* toolbar */
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+
+/* buttons */
+.btn {
+  font: inherit; font-weight: 550; font-size: 13px; cursor: pointer;
+  border-radius: 8px; padding: 8px 13px; border: 1px solid var(--line-strong);
+  background: var(--surface); color: var(--ink); transition: background .12s, border-color .12s, transform .04s;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: linear-gradient(135deg, var(--grad-a), var(--grad-b)); border-color: transparent; color: #fff; }
+.btn.primary:hover { filter: brightness(1.05); }
+.btn.ghost { border-color: transparent; color: var(--accent-ink); background: transparent; padding-left: 6px; padding-right: 6px; }
+.btn.ghost:hover { background: var(--accent-soft); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.block { width: 100%; justify-content: center; }
+
+/* section label (the builder steps / library headings) — neutral, accent reserved for signature spots */
+.label { font-size: 11px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--ink); margin: 16px 0 7px; display: flex; align-items: baseline; gap: 8px; }
+.label .opt { color: var(--faint); font-weight: 500; letter-spacing: 0; text-transform: none; }
+.label .step { color: var(--faint); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* library list */
+.func-list { display: flex; flex-direction: column; gap: 8px; }
+.func-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 11px 12px; box-shadow: var(--shadow);
+}
+.func-card .name { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--ink); }
+.func-card .meta { font-size: 12px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.func-card a { color: var(--accent-ink); text-decoration: none; cursor: pointer; }
+.func-card a:hover { text-decoration: underline; }
+.func-card a.danger { color: var(--danger); }
+.empty { color: var(--faint); font-size: 13px; text-align: center; padding: 28px 12px; }
+
+/* editor */
+.back { font-size: 12.5px; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.back:hover { color: var(--accent-ink); }
+
+.field { width: 100%; font: inherit; font-size: 13.5px; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: 8px; padding: 9px 11px; }
+.field::placeholder { color: var(--faint); }
+.field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+.hint b { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+
+/* helper "?" */
+.helper { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px;
+  border-radius: 50%; background: transparent; border: 1px solid var(--line-strong); color: var(--faint);
+  font-size: 10px; font-weight: 700; cursor: help; }
+
+/* combobox */
+.combo { position: relative; }
+.combo-trigger { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.combo-trigger .val { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-trigger .val.placeholder { color: var(--faint); }
+.combo-trigger .chev { color: var(--faint); flex: none; }
+.combo.open .combo-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.combo-pop {
+  position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px);
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px;
+  box-shadow: var(--shadow-pop); overflow: hidden; display: none;
+}
+.combo.open .combo-pop { display: block; }
+.combo-search { width: 100%; border: none; border-bottom: 1px solid var(--line); background: var(--surface-2);
+  font: inherit; font-size: 13px; padding: 9px 11px; color: var(--ink); }
+.combo-search:focus { outline: none; }
+.combo-options { max-height: 240px; overflow-y: auto; padding: 4px; }
+.combo-group { display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 650; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted); padding: 8px; cursor: pointer; border-radius: 7px; }
+.combo-group:hover { background: var(--surface-2); }
+.combo-group .gchev { font-size: 13px; width: 14px; color: var(--accent); display: inline-flex; justify-content: center; }
+.combo-group .gname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-group .gcount { margin-left: auto; font-weight: 500; color: var(--faint); }
+.combo-opt { padding: 7px 9px 7px 38px; border-radius: 7px; cursor: pointer; font-size: 13px; display: flex; flex-direction: column; gap: 1px; }
+.combo-opt .sub { color: var(--faint); font-size: 11px; line-height: 1.3; }
+.combo-opt:hover, .combo-opt.active { background: var(--accent-soft); }
+.combo-opt[aria-selected="true"] { color: var(--accent-ink); font-weight: 600; }
+.combo-none { padding: 14px; color: var(--faint); font-size: 12.5px; text-align: center; }
+
+/* filter cards */
+.filter-list { display: flex; flex-direction: column; gap: 8px; }
+.filter-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
+.filter-card.dragging { opacity: .5; }
+.filter-card.dragover { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.drag { cursor: grab; color: var(--faint); font-size: 14px; padding: 0 2px; user-select: none; flex: none; }
+.drag:active { cursor: grabbing; }
+.filter-card .row { display: flex; align-items: center; gap: 8px; }
+.filter-card .row + .row { margin-top: 7px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 7px; overflow: hidden; }
+.seg label { font-size: 12px; padding: 5px 10px; cursor: pointer; color: var(--muted); }
+.seg label.on { background: var(--accent); color: #fff; }
+.icon-btn { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 13px; padding: 2px 5px; border-radius: 6px; }
+.icon-btn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+/* THE SIGNATURE — Excel formula bar */
+.formula-bar { margin-top: 16px; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+.formula-bar .fx-row { display: flex; align-items: stretch; }
+.formula-bar .fx {
+  font-family: var(--mono); font-style: italic; font-weight: 700; font-size: 14px;
+  color: #fff; background: linear-gradient(135deg, var(--grad-a), var(--grad-b));
+  display: flex; align-items: center; justify-content: center; padding: 0 12px;
+  flex: none;
+}
+.formula-bar .formula { font-family: var(--mono); font-size: 13px; padding: 11px 12px; color: var(--ink);
+  white-space: pre-wrap; word-break: break-word; line-height: 1.5; flex: 1; }
+.formula .fn { color: var(--accent-ink); font-weight: 600; }
+.formula .arg { color: var(--muted); }
+.formula .lit { color: var(--amber); }
+.formula-bar .explain { border-top: 1px solid var(--line); padding: 10px 12px; font-size: 12.5px; color: var(--muted); }
+.formula-bar .explain b { color: var(--ink); font-weight: 600; }
+.formula-bar .example { margin-top: 6px; font-family: var(--mono); font-size: 12px; color: var(--faint); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

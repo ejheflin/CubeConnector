@@ -171,15 +171,16 @@ namespace CubeConnector
         {
             try
             {
-                // Get the Power BI connection
+                // Get the Power BI connection for this cell's dataset
                 Excel.WorkbookConnection conn;
                 try
                 {
-                    conn = workbook.Connections["CubeConnector"];
+                    DynamicFunctionRegistration.EnsureConnectionForDataset(item.Config);
+                    conn = workbook.Connections[DynamicFunctionRegistration.ConnectionNameForDataset(item.Config)];
                 }
                 catch
                 {
-                    throw new Exception("Connection 'CubeConnector' not found.");
+                    throw new Exception("Connection '" + DynamicFunctionRegistration.ConnectionNameForDataset(item.Config) + "' not found.");
                 }
 
                 // Generate unique sheet name

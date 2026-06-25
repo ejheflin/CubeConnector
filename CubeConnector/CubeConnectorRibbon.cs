@@ -52,10 +52,14 @@ namespace CubeConnector
                                     label='Drill to Details' 
                                     onAction='OnDrillToDetailsClicked'
                                     imageMso='ControlWizards' />
-                            <button id='DrillToPivotBtn' 
-                                    label='Drill to Pivot' 
+                            <button id='DrillToPivotBtn'
+                                    label='Drill to Pivot'
                                     onAction='OnDrillToPivotClicked'
                                     imageMso='PivotTableInsert' />
+                            <button id='ManageFormulasBtn'
+                                    label='Manage Formulas'
+                                    onAction='OnManageFormulasClicked'
+                                    imageMso='TableInsertDialog' />
                         </menu>
                     </splitButton>
                 </group>
@@ -141,6 +145,36 @@ namespace CubeConnector
         {
             DynamicFunctionRegistration.DrillToPivotHandler();
         }
+
+        private static ExcelDna.Integration.CustomUI.CustomTaskPane _pane;
+
+        public void OnManageFormulasClicked(IRibbonControl control)
+        {
+            try
+            {
+                // Start the dataset prefetch the instant the button is clicked, so the model
+                // list is ready by the time the user reaches the dropdown (idempotent + guarded).
+                System.Threading.Tasks.Task.Run(() => PowerBiRestClient.WarmDatasetCache());
+
+                if (_pane == null)
+                {
+                    _pane = ExcelDna.Integration.CustomUI.CustomTaskPaneFactory.CreateCustomTaskPane(
+                        typeof(WizardPaneControl), "CubeConnector");
+                    _pane.DockPosition = ExcelDna.Integration.CustomUI.MsoCTPDockPosition.msoCTPDockPositionRight;
+                    _pane.Width = 440;
+                }
+                _pane.Visible = !_pane.Visible;
+            }
+            catch (Exception ex)
+            {
+                // Fallback to the popup window if the CTP is unavailable in this host.
+                System.Windows.Forms.MessageBox.Show(
+                    "Task pane unavailable, opening window instead.\n\n" + ex.Message,
+                    "CubeConnector");
+                WizardWindow.ShowSingleton();
+            }
+        }
+
         private static void EnsureConnectionExists()
         {
             DynamicFunctionRegistration.EnsureConnectionExists();

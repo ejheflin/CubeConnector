@@ -31,15 +31,28 @@ namespace CubeConnector
     /// Excel-DNA add-in that dynamically registers functions based on JSON configuration
     /// </summary>
     /// 
+    public class ReloadResult
+    {
+        public int Reloaded;
+        public bool RemovedNeedRestart;
+    }
+
     public class DynamicFunctionRegistration : IExcelAddIn
     {
         // Static reference to Excel Application for cache access
         public static Microsoft.Office.Interop.Excel.Application ExcelApp { get; private set; }
 
+        // Track registered function name -> parameter count (arity), to detect new / removed /
+        // arity-changed functions across a runtime reload.
+        private static readonly System.Collections.Generic.Dictionary<string, int> _registeredArity =
+            new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+
         public void AutoOpen()  // NOT static anymore
         {
             try
             {
+                FunctionStore.MigrateLegacyIfNeeded();
+
                 // Store Excel Application reference for cache access
                 ExcelApp = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
 
@@ -47,12 +60,52 @@ namespace CubeConnector
                 if (configs == null || configs.Count == 0) return;
 
                 RegisterFunctionsFromConfig(configs);
+                foreach (var c in configs) _registeredArity[c.FunctionName] = c.Parameters?.Count ?? 0;
                 AddContextMenuItems();
             }
             catch (Exception ex)
             {
                 System.Windows.Forms.MessageBox.Show($"Error: {ex.Message}", "Error");
             }
+        }
+
+        /// <summary>
+        /// Invalidate config cache, re-register all functions, detect deletions.
+        /// Safe to call at runtime — Excel-DNA can register/update but not unregister.
+        /// </summary>
+        public static ReloadResult ReloadFunctions()
+        {
+            ConfigurationStore.Invalidate();
+            var configs = ConfigurationStore.GetAllConfigs() ?? new System.Collections.Generic.List<UDFConfig>();
+
+            // Excel-DNA can register NEW functions at runtime, but only from a macro context
+            // (xlfRegister), and it cannot unregister or change the arity of one already
+            // registered. So: register only the new ones (via QueueAsMacro); a removal or an
+            // arity change requires a restart. A same-arity edit needs nothing here — the
+            // delegate reads fresh config at call time and we already invalidated the cache.
+            var newConfigs = new System.Collections.Generic.List<UDFConfig>();
+            var currentNames = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            bool needRestart = false;
+
+            foreach (var c in configs)
+            {
+                currentNames.Add(c.FunctionName);
+                int arity = c.Parameters?.Count ?? 0;
+                if (!_registeredArity.TryGetValue(c.FunctionName, out int prevArity))
+                    newConfigs.Add(c);                 // brand new -> register live
+                else if (prevArity != arity)
+                    needRestart = true;                // arity changed -> old signature lingers until restart
+            }
+            foreach (var prev in _registeredArity.Keys)
+                if (!currentNames.Contains(prev)) { needRestart = true; break; }  // removed -> lingers until restart
+
+            if (newConfigs.Count > 0)
+                ExcelAsyncUtil.QueueAsMacro(() => RegisterFunctionsFromConfig(newConfigs));
+
+            _registeredArity.Clear();
+            foreach (var c in configs) _registeredArity[c.FunctionName] = c.Parameters?.Count ?? 0;
+
+            return new ReloadResult { Reloaded = configs.Count, RemovedNeedRestart = needRestart };
         }
 
         public void AutoClose()
@@ -87,10 +140,7 @@ namespace CubeConnector
                     registrationItems.Add(registration);
                     //System.Windows.Forms.MessageBox.Show($"Added to list: {config.FunctionName}", "Debug");
                 }
-                else
-                {
-                    System.Windows.Forms.MessageBox.Show($"Registration was NULL for: {config.FunctionName}", "Debug");
-                }
+                // else: CreateFunctionRegistration already shows a diagnostic MessageBox for config errors
             }
 
             //System.Windows.Forms.MessageBox.Show($"About to register {registrationItems.Count} functions", "Debug");
@@ -442,52 +492,61 @@ namespace CubeConnector
                     System.Windows.Forms.MessageBoxIcon.Error);
             }
         }
+        /// <summary>Human-readable workbook-connection name for a dataset: "&lt;ModelName&gt; (&lt;shortId&gt;)".</summary>
+        internal static string ConnectionNameForDataset(UDFConfig config)
+        {
+            string model = (config != null ? config.ModelName : null) ?? "";
+            model = model.Trim();
+            string label;
+            if (model.Length == 0) label = "CubeConnector Data";
+            else
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (char c in model)
+                    if (char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '_') sb.Append(c);
+                label = sb.ToString().Trim();
+                if (label.Length == 0) label = "CubeConnector Data";
+            }
+            return label + " (" + ShortDatasetId(config != null ? config.DatasetId : null) + ")";
+        }
+
+        /// <summary>Short stable id (first 8 alphanumerics of the dataset GUID) for sheet/listobject names (Excel sheet names max 31 chars).</summary>
+        internal static string ShortDatasetId(string datasetId)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in datasetId ?? "") { if (char.IsLetterOrDigit(c)) sb.Append(c); if (sb.Length >= 8) break; }
+            return sb.Length > 0 ? sb.ToString() : "ds";
+        }
+
+        /// <summary>Create the workbook connection for one dataset if it doesn't already exist.</summary>
+        internal static void EnsureConnectionForDataset(UDFConfig config)
+        {
+            var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
+            var workbook = app.ActiveWorkbook;
+            string connName = ConnectionNameForDataset(config);
+            try { var existing = workbook.Connections[connName]; return; } catch { }
+            string connectionString = ModelIntrospector.BuildConnectionString(config.DatasetId, config.TenantId);
+            workbook.Connections.Add2(
+                Name: connName,
+                Description: "CubeConnector dataset connection",
+                ConnectionString: connectionString,
+                CommandText: "Model",
+                lCmdtype: Microsoft.Office.Interop.Excel.XlCmdType.xlCmdDefault,
+                CreateModelConnection: Type.Missing,
+                ImportRelationships: Type.Missing);
+        }
+
         internal static void EnsureConnectionExists()
         {
             try
             {
-                var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
-                var workbook = app.ActiveWorkbook;
-                string connName = "CubeConnector";
-
-                // Check if connection already exists
-                try
-                {
-                    var existingConn = workbook.Connections[connName];
-                    return; // Connection exists, we're done
-                }
-                catch
-                {
-                    // Connection doesn't exist, create it
-                }
-
-                // Get first config to extract connection details
                 var configs = ConfigurationStore.GetAllConfigs();
                 if (configs == null || configs.Count == 0)
-                {
                     throw new Exception("No configuration found. Cannot create connection.");
-                }
-
-                var config = configs[0]; // Use first config for tenant/dataset
-
-                // Build Power BI connection string (same format as your old ThisAddIn)
-                string connectionString = $"OLEDB;Provider=MSOLAP.8;Integrated Security=ClaimsToken;Persist Security Info=True;" +
-                    $"Initial Catalog={config.DatasetId};" +
-                    $"Data Source=pbiazure://api.powerbi.com;" +
-                    $"MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;" +
-                    $"Identity Provider=https://login.microsoftonline.com/common, https://analysis.windows.net/powerbi/api, {config.TenantId};" +
-                    $"Update Isolation Level=2";
-
-                // Create the connection
-                workbook.Connections.Add2(
-                    Name: connName,
-                    Description: "Auto-created by CubeConnector",
-                    ConnectionString: connectionString,
-                    CommandText: "Model",
-                    lCmdtype: Microsoft.Office.Interop.Excel.XlCmdType.xlCmdDefault,
-                    CreateModelConnection: Type.Missing,
-                    ImportRelationships: Type.Missing
-                );
+                var seen = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+                foreach (var c in configs)
+                    if (!string.IsNullOrEmpty(c.DatasetId) && seen.Add(c.DatasetId))
+                        EnsureConnectionForDataset(c);
             }
             catch (Exception ex)
             {
