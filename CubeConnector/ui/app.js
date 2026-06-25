@@ -10,7 +10,7 @@ function $(id){ return document.getElementById(id); }
 
 /* ---------- searchable combobox ---------- */
 function Combo(mount, opts){
-  let items = [], value = null, activeIdx = -1, collapsed = new Set();
+  let items = [], value = null, activeIdx = -1, collapsed = new Set(), loading = false;
   const root = document.createElement('div'); root.className = 'combo';
   root.innerHTML =
     `<div class="combo-trigger field" tabindex="0"><span class="val placeholder"></span><span class="chev">▾</span></div>
@@ -48,8 +48,9 @@ function Combo(mount, opts){
   }
   function render(q){
     activeIdx = -1;
-    const list = items.filter(it=>match(it,q));
     optsEl.innerHTML = '';
+    if(loading && !items.length){ optsEl.innerHTML = `<div class="combo-none">Loading…</div>`; return; }
+    const list = items.filter(it=>match(it,q));
     if(!list.length){ optsEl.innerHTML = `<div class="combo-none">No matches</div>`; return; }
     if(opts.grouped){
       const searching = !!q.trim();
@@ -71,7 +72,8 @@ function Combo(mount, opts){
   function choose(it, fromUser){ value = it.value; setLabel(it.label); if(fromUser && opts.onSelect) opts.onSelect(it.value, it); }
 
   return {
-    setItems(list){ items = list || []; if(opts.defaultCollapsed) collapsed = new Set(items.map(i=>i.group||'')); },
+    setItems(list){ items = list || []; loading = false; if(opts.defaultCollapsed) collapsed = new Set(items.map(i=>i.group||'')); if(root.classList.contains('open')) render(search.value); },
+    setLoading(v){ loading = !!v; if(root.classList.contains('open')) render(search.value); },
     getValue(){ return value; },
     setValueLabel(v, label){ value = v; setLabel(label); },
     selectByValue(v){ const it = items.find(x=>x.value===v); if(it){ choose(it, false); return it; } return null; },
@@ -128,6 +130,7 @@ async function newFunction(){
   modelCombo.clear(); measureCombo.clear();
   MODEL = { measures:[], columns:[] };
   renderFilters(); renderPreview();
+  modelCombo.setLoading(true);
   await loadModels();
 }
 
@@ -145,7 +148,7 @@ function onModelPicked(id, it){
 }
 
 async function loadMeasures(id, wsId){
-  measureCombo.setItems([{ value:'', label:'Loading measures…' }]);
+  measureCombo.setLoading(true);
   try { MODEL = await call(cc.GetModel(id, wsId)); }
   catch(e){ MODEL = { measures:[], columns:[] }; measureCombo.setItems([]); showStatus("Couldn't read this model — you may not have access."); renderFilters(); return; }
   measureCombo.setItems((MODEL.measures||[]).map(m => ({ value:m.Name, label:m.Name, group:m.Table || 'Measures', sub:m.Description||'' })));
@@ -269,6 +272,7 @@ async function editFunction(name){
   measureCombo.setValueLabel(measName, measName);   // instant — before measures load
   CURRENT.MeasureName = f.MeasureName;
   renderFilters(); renderPreview();
+  modelCombo.setLoading(true);
   await loadModels();
   const it = modelCombo.selectByValue(f.DatasetId);     // programmatic: shows real model name, doesn't reset measure
   if(it){ CURRENT.DatasetId=f.DatasetId; CURRENT._group=it.wsId||''; CURRENT.ModelName=it.label; await loadMeasures(f.DatasetId, it.wsId||''); }
