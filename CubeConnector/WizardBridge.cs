@@ -75,14 +75,14 @@ namespace CubeConnector
                         var info = ModelIntrospector.IntrospectDataset(app.ActiveWorkbook ?? app.Workbooks.Add(), datasetId, tenantId);
                         md = new ModelMetadata();
                         md.Tables.AddRange(info.Tables.Select(t => t.Name));
-                        md.Measures.AddRange(info.Measures.Select(m => new ModelMeasure { Table = m.Table, Name = m.Name }));
-                        md.Columns.AddRange(info.Columns.Select(c => new ModelColumn { Table = c.Table, Name = c.Name, DataType = c.DataType, IsHidden = c.IsHidden }));
+                        md.Measures.AddRange(info.Measures.Select(m => new ModelMeasure { Table = m.Table, Name = m.Name, Description = m.Description }));
+                        md.Columns.AddRange(info.Columns.Select(c => new ModelColumn { Table = c.Table, Name = c.Name, DataType = c.DataType, IsHidden = c.IsHidden, Description = c.Description }));
                     }
                     if (!string.IsNullOrEmpty(datasetId)) _modelCache[datasetId] = md;
                 }
                 return Ok(new {
-                    measures = md.Measures.Select(m => new { m.Table, m.Name }),
-                    columns = md.Columns.Where(c => !c.IsHidden).Select(c => new { c.Table, c.Name, c.DataType })
+                    measures = md.Measures.Select(m => new { m.Table, m.Name, m.Description }),
+                    columns = md.Columns.Where(c => !c.IsHidden).Select(c => new { c.Table, c.Name, c.DataType, c.Description })
                 });
             } catch (Exception e) { return Err(e); }
         }
