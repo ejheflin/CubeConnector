@@ -75,7 +75,7 @@ function Combo(mount, opts){
 /* ---------- boot ---------- */
 async function boot(){
   modelCombo = Combo($('modelCombo'), { placeholder:'Choose your data…', searchPlaceholder:'Search models or workspaces…', grouped:true, onSelect:onModelPicked });
-  measureCombo = Combo($('measureCombo'), { placeholder:'Choose a number…', searchPlaceholder:'Search measures…', grouped:false,
+  measureCombo = Combo($('measureCombo'), { placeholder:'Choose a number…', searchPlaceholder:'Search measures…', grouped:true,
     onSelect:(v)=>{ CURRENT.MeasureName = '['+v+']'; renderPreview(); } });
   try { const a = await call(cc.GetAccount()); $('account').textContent = 'Signed in: ' + (a.upn||'(unknown)'); }
   catch(e){ $('account').textContent = 'Not signed in'; }
@@ -141,7 +141,7 @@ async function loadMeasures(id, wsId){
   measureCombo.setItems([{ value:'', label:'Loading measures…' }]);
   try { MODEL = await call(cc.GetModel(id, wsId)); }
   catch(e){ MODEL = { measures:[], columns:[] }; measureCombo.setItems([]); showStatus("Couldn't read this model — you may not have access."); renderFilters(); return; }
-  measureCombo.setItems((MODEL.measures||[]).map(m => ({ value:m.Name, label:m.Name, sub:m.Table })));
+  measureCombo.setItems((MODEL.measures||[]).map(m => ({ value:m.Name, label:m.Name, group:m.Table || 'Measures' })));
   renderFilters(); renderPreview();
 }
 
@@ -156,9 +156,9 @@ function renderFilters(){
   const fieldItems = cols.map(c => ({ value:`${c.Table}||${c.Name}||${c.DataType}`, label:c.Name, group:c.Table }));
   CURRENT.Parameters.filter(p=>!p._isEnd).forEach(p=>{
     const idx = CURRENT.Parameters.indexOf(p);
-    const card = document.createElement('div'); card.className='filter-card';
+    const card = document.createElement('div'); card.className='filter-card'; card.dataset.idx = idx;
     card.innerHTML =
-      `<div class="row"><div class="fieldcombo" style="flex:1"></div>
+      `<div class="row"><span class="drag" title="Drag to reorder">⠿</span><div class="fieldcombo" style="flex:1"></div>
          <button class="icon-btn" title="Remove" onclick="removeFilter(${idx})">✕</button></div>
        <div class="row">
          <span class="seg">
@@ -174,7 +174,24 @@ function renderFilters(){
     });
     combo.setItems(fieldItems);
     if(p.TableName && p.FieldName) combo.setValueLabel(`${p.TableName}||${p.FieldName}||${p.DataType}`, p.FieldName);
+    wireDrag(card);
   });
+}
+
+let dragSrc = null;
+function wireDrag(card){
+  const handle = card.querySelector('.drag');
+  handle.draggable = true;
+  handle.addEventListener('dragstart', e=>{ dragSrc = +card.dataset.idx; card.classList.add('dragging');
+    e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain', card.dataset.idx); }catch(_){} });
+  handle.addEventListener('dragend', ()=>{ card.classList.remove('dragging');
+    document.querySelectorAll('.filter-card.dragover').forEach(c=>c.classList.remove('dragover')); });
+  card.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; card.classList.add('dragover'); });
+  card.addEventListener('dragleave', ()=> card.classList.remove('dragover'));
+  card.addEventListener('drop', e=>{ e.preventDefault(); card.classList.remove('dragover');
+    const to = +card.dataset.idx;
+    if(dragSrc!=null && dragSrc!==to){ const a=CURRENT.Parameters; const [m]=a.splice(dragSrc,1); a.splice(to,0,m); renderFilters(); renderPreview(); }
+    dragSrc=null; });
 }
 function setField(i,v){ const [t,f,dt]=v.split('||'); const p=CURRENT.Parameters[i]; p.TableName=t; p.FieldName=f;
   p.DataType=mapType(dt); if(!p.Name) p.Name=suggest(f); renderFilters(); renderPreview(); }
