@@ -107,7 +107,7 @@ async function refreshLibrary(){
   if(!fns.length){ list.innerHTML = `<div class="empty">No formulas yet. Click “+ New formula”, or import a set someone shared with you.</div>`; return; }
   fns.forEach(f => {
     const div = document.createElement('div'); div.className = 'func-card';
-    const filters = (f.Parameters||[]).filter(p=>p.FilterType!=='RangeEnd').length;
+    const filters = (f.Parameters||[]).length;
     div.innerHTML =
       `<div class="name">${esc(f.FunctionName)}</div>
        <div class="meta">${esc(f.ModelName||'')}${f.ModelName?' · ':''}${esc(f.MeasureName||'')} · ${filters} filter${filters===1?'':'s'}
@@ -164,17 +164,19 @@ function renderFilters(){
   const cols = MODEL.columns || [];
   // field options grouped by table, for the searchable field picker
   const fieldItems = cols.map(c => ({ value:`${c.Table}||${c.Name}||${c.DataType}`, label:c.Name, group:c.Table, sub:c.Description||'' }));
-  CURRENT.Parameters.filter(p=>!p._isEnd).forEach(p=>{
-    const idx = CURRENT.Parameters.indexOf(p);
+  CURRENT.Parameters.forEach((p, idx)=>{
     const card = document.createElement('div'); card.className='filter-card'; card.dataset.idx = idx;
     card.innerHTML =
       `<div class="row"><span class="drag" title="Drag to reorder">⠿</span><div class="fieldcombo" style="flex:1"></div>
          <button class="icon-btn" title="Remove" onclick="removeFilter(${idx})">✕</button></div>
        <div class="row">
          <span class="seg">
-           <label class="${p._kind!=='range'?'on':''}"><input type="radio" name="k${idx}" hidden ${p._kind!=='range'?'checked':''} onchange="setKind(${idx},'match')">Match value(s)</label>
-           <label class="${p._kind==='range'?'on':''}"><input type="radio" name="k${idx}" hidden ${p._kind==='range'?'checked':''} onchange="setKind(${idx},'range')">Date range</label>
+           <label class="${p._kind==='match'?'on':''}"><input type="radio" name="k${idx}" hidden ${p._kind==='match'?'checked':''} onchange="setKind(${idx},'match')">Match</label>
+           <label class="${p._kind==='start'?'on':''}"><input type="radio" name="k${idx}" hidden ${p._kind==='start'?'checked':''} onchange="setKind(${idx},'start')">Start ≥</label>
+           <label class="${p._kind==='end'?'on':''}"><input type="radio" name="k${idx}" hidden ${p._kind==='end'?'checked':''} onchange="setKind(${idx},'end')">End ≤</label>
          </span>
+       </div>
+       <div class="row">
          <input class="field" style="flex:1" placeholder="filter name" value="${esc(p.Name||'')}" oninput="setName(${idx}, this.value)">
        </div>`;
     wrap.appendChild(card);
@@ -203,22 +205,24 @@ function wireDrag(card){
     if(dragSrc!=null && dragSrc!==to){ const a=CURRENT.Parameters; const [m]=a.splice(dragSrc,1); a.splice(to,0,m); renderFilters(); renderPreview(); }
     dragSrc=null; });
 }
+function suggestName(field, kind){ const base=suggest(field); return base + (kind==='start'?'_start':kind==='end'?'_end':''); }
 function setField(i,v){ const [t,f,dt]=v.split('||'); const p=CURRENT.Parameters[i]; p.TableName=t; p.FieldName=f;
-  p.DataType=mapType(dt); if(!p.Name) p.Name=suggest(f); renderFilters(); renderPreview(); }
+  p.DataType=mapType(dt); if(!p.Name) p.Name=suggestName(f, p._kind); renderFilters(); renderPreview(); }
 function setName(i,v){ CURRENT.Parameters[i].Name=v; renderPreview(); }
-function setKind(i,k){ CURRENT.Parameters[i]._kind=k; renderFilters(); renderPreview(); }
+function setKind(i,k){
+  const p = CURRENT.Parameters[i];
+  const prevAuto = p.FieldName ? suggestName(p.FieldName, p._kind) : '';
+  p._kind = k;
+  if(p.FieldName && (!p.Name || p.Name === prevAuto)) p.Name = suggestName(p.FieldName, k);
+  renderFilters(); renderPreview();
+}
 function removeFilter(i){ CURRENT.Parameters.splice(i,1); renderFilters(); renderPreview(); }
 function mapType(dt){ dt=(dt||'').toLowerCase(); if(dt.includes('date')||dt.includes('time'))return 'date';
   if(['integer','int64','number','double','decimal','currency'].includes(dt))return 'number'; return 'text'; }
 function suggest(f){ return (f||'param').replace(/[^A-Za-z0-9]/g,'').toLowerCase(); }
 
 function paramNames(){
-  const out=[];
-  CURRENT.Parameters.filter(p=>!p._isEnd).forEach(p=>{
-    if(p._kind==='range') out.push((p.Name||'from')+'_start',(p.Name||'to')+'_end');
-    else out.push(p.Name||'value');
-  });
-  return out;
+  return CURRENT.Parameters.map(p => p.Name || suggestName(p.FieldName, p._kind) || 'value');
 }
 function renderPreview(){
   const friendly = ($('friendlyName').value||'Formula');
@@ -230,7 +234,7 @@ function renderPreview(){
   $('formula').innerHTML = `<span class="fn">=${esc(fnName)}</span>(` +
     names.map(n=>`<span class="arg">${esc(n)}</span>`).join(', ') + ')';
   $('explain').innerHTML = `Returns <b>${esc(measure)}</b>` + (names.length? `, filtered by ${esc(names.join(', '))}.` : '.');
-  const ex = names.map(n => /date|start|end/.test(n) ? '"1/1/2025"' : '"4000"');
+  const ex = CURRENT.Parameters.map(p => p.DataType==='date' ? '"1/1/2025"' : p.DataType==='number' ? '"4000"' : '"East"');
   $('example').innerHTML = names.length
     ? 'e.g. <span class="lit">=' + esc(fnName) + '(' + ex.join(', ') + ')</span>'
     : '';
@@ -241,13 +245,17 @@ async function saveFunction(){
   const measure = measureCombo.getValue();
   if(!measure || !friendly){ showStatus('Pick the number you want and give the formula a name.'); return; }
   const params=[]; let pos=0;
-  CURRENT.Parameters.filter(p=>!p._isEnd).forEach(p=>{
-    if(p._kind==='range'){
-      params.push({Name:(p.Name||'from')+'_start',Position:pos++,TableName:p.TableName,FieldName:p.FieldName,DataType:'date',FilterType:'RangeStart',IsOptional:true});
-      params.push({Name:(p.Name||'to')+'_end',Position:pos++,TableName:p.TableName,FieldName:p.FieldName,DataType:'date',FilterType:'RangeEnd',IsOptional:true});
-    } else {
-      params.push({Name:p.Name||'value',Position:pos++,TableName:p.TableName,FieldName:p.FieldName,DataType:p.DataType||'text',FilterType:'List',IsOptional:true});
-    }
+  const kindToFilter = { match:'List', start:'RangeStart', end:'RangeEnd' };
+  CURRENT.Parameters.forEach(p=>{
+    params.push({
+      Name: p.Name || suggestName(p.FieldName, p._kind),
+      Position: pos++,
+      TableName: p.TableName,
+      FieldName: p.FieldName,
+      DataType: p.DataType || 'text',
+      FilterType: kindToFilter[p._kind] || 'List',
+      IsOptional: true
+    });
   });
   const dto = { FunctionName:'CC.'+friendly.replace(/[^A-Za-z0-9_]/g,''), MeasureName:'['+measure+']',
     DatasetId:CURRENT.DatasetId, TenantId:'', ModelName:CURRENT.ModelName||'', Parameters:params };
@@ -263,9 +271,9 @@ async function editFunction(name){
   const o = await call(cc.GetFunctions());
   const f = (o.functions||[]).find(x=>x.FunctionName===name); if(!f) return;
   CURRENT = JSON.parse(JSON.stringify(f)); CURRENT._group='';
-  // collapse RangeStart/RangeEnd pairs back to one "range" filter for editing
-  CURRENT.Parameters = (f.Parameters||[]).filter(p=>p.FilterType!=='RangeEnd')
-    .map(p=>({ ...p, _kind: p.FilterType==='RangeStart' ? 'range' : 'match' }));
+  // each stored parameter becomes one card; map its FilterType to a UI kind
+  const filterToKind = { List:'match', RangeStart:'start', RangeEnd:'end' };
+  CURRENT.Parameters = (f.Parameters||[]).map(p=>({ ...p, _kind: filterToKind[p.FilterType] || 'match' }));
   showEditor();
   $('friendlyName').value = name.replace(/^CC\./,'');
   const measName = (f.MeasureName||'').replace(/^\[|\]$/g,'');
