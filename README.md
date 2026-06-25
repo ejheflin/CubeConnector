@@ -59,19 +59,20 @@ CubeConnector leverages **Microsoft's own "Analyze in Excel" connection** infras
 
 1. Download the latest release from the [Releases](../../releases) page
 2. Extract the files to a local directory
-3. Configure your `CubeConnectorConfig.json` file using one of these methods:
+3. Set up your formulas using one of these methods:
 
-#### Option 1: Visual Config Wizard (Recommended)
+#### Option 1: In-Excel Config Wizard (Recommended)
 
-Use the [CubeConnector Config Wizard](https://ejheflin.github.io/CubeConnector/) for an intuitive visual configuration experience:
+Once the add-in is loaded, configure everything from inside Excel — there's no separate file to hand-edit:
 
-1. Open the wizard in Chrome or Edge (requires File System Access API)
-2. Click "Open Config" and select your `CubeConnectorConfig.json` file
-3. Enter your Tenant ID once in the sidebar
-4. Add functions and configure their dataset IDs, measure names, and parameters
-5. Click "Save Config" to write changes back to your json file
+1. Go to **Data ▸ CubeConnector ▸ Manage Formulas** to open the configuration task pane
+2. Sign in to Power BI (silent single sign-on; falls back to a browser prompt the first time)
+3. Pick your dataset (model) and the measure you want, then add any optional filters
+4. Click **Save formula** — it's registered and ready to use in a cell immediately (no Excel restart needed for new formulas)
 
-**Note:** The config wizard is optional - advanced users can edit the JSON directly (see Option 2).
+Your formulas are stored per user, so there's no need to place a `CubeConnectorConfig.json` next to the `.xll`.
+
+**Note:** The wizard is optional — advanced users can edit the JSON directly (see Option 2).
 
 #### Option 2: Manual JSON Edit
 

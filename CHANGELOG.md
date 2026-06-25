@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Retired the standalone web-based Config Editor (GitHub Pages `docs/index.html`). Configuration now lives in the in-Excel task pane (**Data ▸ CubeConnector ▸ Manage Formulas**), which authenticates, enumerates models/measures, and registers formulas directly.
+
 ### Added
 - Initial public release
 - Dynamic function registration from JSON configuration
