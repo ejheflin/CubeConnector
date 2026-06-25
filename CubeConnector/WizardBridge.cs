@@ -178,5 +178,69 @@ namespace CubeConnector
                 return Ok(new { added = r.Added, overwritten = r.Overwritten, skipped = r.Skipped });
             } catch (Exception e) { return Err(e); }
         }
+
+        // ---- native file dialogs ----
+        // The UI calls these to pick a path, then passes it to Export/ImportFunctions.
+        // Returns { path } on selection, { canceled = true } if dismissed, or { error }.
+        // WebView2 dispatches host-object calls on the UI (STA) thread that owns the
+        // CoreWebView2, so showing a WinForms dialog here is safe and modal to Excel.
+
+        private const string FormulaFileFilter =
+            "CubeConnector formulas (*.json)|*.json|All files (*.*)|*.*";
+
+        public string PickImportPath()
+        {
+            try
+            {
+                using (var dlg = new System.Windows.Forms.OpenFileDialog
+                {
+                    Title = "Import shared formulas",
+                    Filter = FormulaFileFilter,
+                    CheckFileExists = true,
+                    Multiselect = false
+                })
+                {
+                    return dlg.ShowDialog(OwnerWindow()) == System.Windows.Forms.DialogResult.OK
+                        ? Ok(new { path = dlg.FileName })
+                        : Ok(new { canceled = true });
+                }
+            }
+            catch (Exception e) { return Err(e); }
+        }
+
+        public string PickExportPath(string suggestedName)
+        {
+            try
+            {
+                using (var dlg = new System.Windows.Forms.SaveFileDialog
+                {
+                    Title = "Export shared formulas",
+                    Filter = FormulaFileFilter,
+                    DefaultExt = "json",
+                    AddExtension = true,
+                    OverwritePrompt = true,
+                    FileName = string.IsNullOrWhiteSpace(suggestedName) ? "CubeConnector-formulas.json" : suggestedName
+                })
+                {
+                    return dlg.ShowDialog(OwnerWindow()) == System.Windows.Forms.DialogResult.OK
+                        ? Ok(new { path = dlg.FileName })
+                        : Ok(new { canceled = true });
+                }
+            }
+            catch (Exception e) { return Err(e); }
+        }
+
+        // Excel's main window, so the dialog is owned (modal + foreground) rather than orphaned.
+        private static System.Windows.Forms.IWin32Window OwnerWindow()
+        {
+            try { return new WinHandle((IntPtr)ExcelDna.Integration.ExcelDnaUtil.WindowHandle); }
+            catch { return null; }
+        }
+
+        private class WinHandle : System.Windows.Forms.IWin32Window
+        {
+            public WinHandle(IntPtr h) { Handle = h; }
+            public IntPtr Handle { get; private set; }
+        }
     }
 }

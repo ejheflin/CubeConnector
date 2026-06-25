@@ -289,7 +289,9 @@ async function delFunction(name){
 
 /* ---------- import / export / reload ---------- */
 async function doImport(){
-  const path = prompt('Path to the shared formulas file (.json):'); if(!path) return;
+  let path;
+  try { const pick = await call(cc.PickImportPath()); if(pick.canceled) return; path = pick.path; }
+  catch(e){ showStatus('Import failed: ' + e.message); return; }
   const policy = confirm('Overwrite formulas that already exist?\n\nOK = overwrite,  Cancel = keep both') ? 'Overwrite' : 'KeepBoth';
   try {
     const r = await call(cc.ImportFunctions(path, policy));
@@ -301,7 +303,9 @@ async function doImport(){
   } catch(e){ showStatus('Import failed: ' + e.message); }
 }
 async function doExport(){
-  const path = prompt('Save the shared formulas file to (.json):'); if(!path) return;
+  let path;
+  try { const pick = await call(cc.PickExportPath('CubeConnector-formulas.json')); if(pick.canceled) return; path = pick.path; }
+  catch(e){ showStatus('Export failed: ' + e.message); return; }
   try { await call(cc.ExportFunctions(JSON.stringify([]), path)); showStatus('✓ Exported to ' + path); }
   catch(e){ showStatus('Export failed: ' + e.message); }
 }

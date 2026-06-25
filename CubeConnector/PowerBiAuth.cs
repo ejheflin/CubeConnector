@@ -42,8 +42,6 @@ namespace CubeConnector
 
         // Single scope (no extras) for the WAM helper.
         private const string WamScope = "https://analysis.windows.net/powerbi/api/.default";
-        // Dev fallback path for the out-of-process WAM helper.
-        private const string WamHelperDevPath = @"C:\dev\CubeConnector_gh\WamHelper\bin\Release\WamHelper.exe";
 
         private static string AppDataDir
         {
@@ -232,7 +230,11 @@ namespace CubeConnector
             catch (Exception ex) { error = ex.GetType().Name + ": " + ex.Message; return null; }
         }
 
-        /// <summary>Find WamHelper.exe next to the add-in, else fall back to the dev build path.</summary>
+        /// <summary>
+        /// Find WamHelper.exe shipped beside the add-in — either directly next to the
+        /// .xll or in a .\WamHelper\ subfolder (the layout the build/installer produces).
+        /// Returns null if not found (the auth cascade then skips WAM zero-click SSO).
+        /// </summary>
         private static string ResolveWamHelperPath()
         {
             try
@@ -248,7 +250,7 @@ namespace CubeConnector
                 }
             }
             catch { }
-            return File.Exists(WamHelperDevPath) ? WamHelperDevPath : null;
+            return null;
         }
 
         // ---- interactive browser auth-code flow ----
