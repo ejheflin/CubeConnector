@@ -176,6 +176,7 @@
     <Compile Include="PowerBiAuth.cs" />
     <Compile Include="PowerBiRestClient.cs" />
     <Compile Include="WizardBridge.cs" />
+    <Compile Include="UiHost.cs" />
     <Compile Include="WizardPaneControl.cs" />
     <Compile Include="WizardWindow.cs" />
     <Compile Include="PivotManager.cs" />
@@ -217,6 +218,12 @@
     <EmbeddedResource Include="cubeconnectorlogo.png" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="ui\index.html" />
+    <EmbeddedResource Include="ui\app.js" />
+    <EmbeddedResource Include="ui\styles.css" />
+    <EmbeddedResource Include="ui\cubeconnectorlogo.png" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="connectionstring.png" />
   </ItemGroup>
   <PropertyGroup>
@@ -245,12 +252,8 @@
           SkipUnchangedFiles="true"
           Condition="'@(WamHelperFiles)' != ''" />
   </Target>
-  <Target Name="CopyWebView2AndUi" AfterTargets="Build">
+  <Target Name="CopyWebView2Loader" AfterTargets="Build">
     <Copy SourceFiles="$(MSBuildProjectDirectory)\..\packages\Microsoft.Web.WebView2.1.0.4022.49\runtimes\win-x64\native\WebView2Loader.dll"
           DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-    <ItemGroup>
-      <UiFiles Include="$(MSBuildProjectDirectory)\ui\**\*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(UiFiles)" DestinationFiles="@(UiFiles->'$(OutDir)ui\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(UiFiles)' != ''" />
   </Target>
 </Project>

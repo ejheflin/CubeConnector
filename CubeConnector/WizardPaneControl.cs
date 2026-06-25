@@ -62,10 +62,7 @@ namespace CubeConnector
 
                 _web.CoreWebView2.AddHostObjectToScript("cc", new WizardBridge());
 
-                string uiDir = Path.Combine(
-                    Path.GetDirectoryName(ExcelDna.Integration.ExcelDnaUtil.XllPath), "ui");
-                _web.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                    "cubeconnector.ui", uiDir, CoreWebView2HostResourceAccessKind.Allow);
+                UiHost.AttachEmbeddedUi(_web.CoreWebView2, env);
                 _web.CoreWebView2.Navigate("https://cubeconnector.ui/index.html");
             }
             catch (Exception ex)
