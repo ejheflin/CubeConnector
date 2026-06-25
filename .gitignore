@@ -419,3 +419,6 @@ tmpclaude-*
 *_output.txt
 enumerate_smoketest.txt
 Example.xlsx
+
+# Release packaging output
+release/
