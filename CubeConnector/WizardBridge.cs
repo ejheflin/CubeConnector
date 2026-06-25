@@ -178,14 +178,5 @@ namespace CubeConnector
                 return Ok(new { added = r.Added, overwritten = r.Overwritten, skipped = r.Skipped });
             } catch (Exception e) { return Err(e); }
         }
-
-        // Dev-only; removed before completion (Task 7).
-        public string SelfCheck()
-        {
-            try {
-                string n = FunctionStore.SanitizeName("Net Amount 2025!");
-                return Ok(new { sanitize = n });
-            } catch (Exception e) { return Err(e); }
-        }
     }
 }
