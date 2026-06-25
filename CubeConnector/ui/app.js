@@ -224,13 +224,44 @@ function suggest(f){ return (f||'param').replace(/[^A-Za-z0-9]/g,'').toLowerCase
 function paramNames(){
   return CURRENT.Parameters.map(p => p.Name || suggestName(p.FieldName, p._kind) || 'value');
 }
+// Excel built-in worksheet functions (English). A UDF sharing one of these names is shadowed
+// by the built-in and won't work, so we warn live and block on save. Case-insensitive. Covers
+// the standard set (incl. legacy/compatibility names); extend as Excel adds functions.
+const RESERVED = new Set([
+  // math & trig
+  "ABS","ACOS","ACOSH","ACOT","ACOTH","AGGREGATE","ARABIC","ASIN","ASINH","ATAN","ATAN2","ATANH","BASE","CEILING","COMBIN","COMBINA","COS","COSH","COT","COTH","CSC","CSCH","DECIMAL","DEGREES","EVEN","EXP","FACT","FACTDOUBLE","FLOOR","GCD","INT","LCM","LN","LOG","LOG10","MDETERM","MINVERSE","MMULT","MOD","MROUND","MULTINOMIAL","MUNIT","ODD","PI","POWER","PRODUCT","QUOTIENT","RADIANS","RAND","RANDARRAY","RANDBETWEEN","ROMAN","ROUND","ROUNDDOWN","ROUNDUP","SEC","SECH","SERIESSUM","SIGN","SIN","SINH","SQRT","SQRTPI","SUBTOTAL","SUM","SUMIF","SUMIFS","SUMPRODUCT","SUMSQ","SUMX2MY2","SUMX2PY2","SUMXMY2","TAN","TANH","TRUNC",
+  // statistical (incl. legacy names)
+  "AVEDEV","AVERAGE","AVERAGEA","AVERAGEIF","AVERAGEIFS","CORREL","COUNT","COUNTA","COUNTBLANK","COUNTIF","COUNTIFS","COVAR","CONFIDENCE","CRITBINOM","DEVSQ","FISHER","FISHERINV","FORECAST","FREQUENCY","GAMMA","GAMMALN","GAUSS","GEOMEAN","GROWTH","HARMEAN","INTERCEPT","KURT","LARGE","LINEST","LOGEST","MAX","MAXA","MAXIFS","MEDIAN","MIN","MINA","MINIFS","MODE","PEARSON","PERCENTILE","PERCENTRANK","PERMUT","PERMUTATIONA","PHI","PROB","QUARTILE","RANK","RSQ","SKEW","SLOPE","SMALL","STANDARDIZE","STDEV","STDEVA","STDEVP","STDEVPA","STEYX","TREND","TRIMMEAN","VAR","VARA","VARP","VARPA","ZTEST","NORMDIST","NORMINV","NORMSDIST","NORMSINV","LOGNORMDIST","LOGINV","BINOMDIST","NEGBINOMDIST","POISSON","EXPONDIST","WEIBULL","HYPGEOMDIST","BETADIST","BETAINV","CHIDIST","CHIINV","CHITEST","FDIST","FINV","FTEST","TDIST","TINV","TTEST","GAMMADIST","GAMMAINV",
+  // text
+  "ARRAYTOTEXT","ASC","BAHTTEXT","CHAR","CLEAN","CODE","CONCAT","CONCATENATE","DBCS","DOLLAR","EXACT","FIND","FINDB","FIXED","LEFT","LEFTB","LEN","LENB","LOWER","MID","MIDB","NUMBERVALUE","PROPER","REPLACE","REPLACEB","REPT","RIGHT","RIGHTB","SEARCH","SEARCHB","SUBSTITUTE","T","TEXT","TEXTAFTER","TEXTBEFORE","TEXTJOIN","TEXTSPLIT","TRIM","UNICHAR","UNICODE","UPPER","VALUE","VALUETOTEXT",
+  // logical
+  "AND","BYCOL","BYROW","FALSE","IF","IFERROR","IFNA","IFS","LAMBDA","LET","MAKEARRAY","MAP","NOT","OR","REDUCE","SCAN","SWITCH","TRUE","XOR",
+  // lookup & reference
+  "ADDRESS","AREAS","CHOOSE","CHOOSECOLS","CHOOSEROWS","COLUMN","COLUMNS","DROP","EXPAND","FILTER","FORMULATEXT","GETPIVOTDATA","HLOOKUP","HSTACK","HYPERLINK","INDEX","INDIRECT","LOOKUP","MATCH","OFFSET","ROW","ROWS","RTD","SORT","SORTBY","TAKE","TOCOL","TOROW","TRANSPOSE","UNIQUE","VLOOKUP","VSTACK","WRAPCOLS","WRAPROWS","XLOOKUP","XMATCH",
+  // date & time
+  "DATE","DATEDIF","DATEVALUE","DAY","DAYS","DAYS360","EDATE","EOMONTH","HOUR","ISOWEEKNUM","MINUTE","MONTH","NETWORKDAYS","NOW","SECOND","TIME","TIMEVALUE","TODAY","WEEKDAY","WEEKNUM","WORKDAY","YEAR","YEARFRAC",
+  // financial
+  "ACCRINT","ACCRINTM","AMORDEGRC","AMORLINC","COUPDAYBS","COUPDAYS","COUPDAYSNC","COUPNCD","COUPNUM","COUPPCD","CUMIPMT","CUMPRINC","DB","DDB","DISC","DOLLARDE","DOLLARFR","DURATION","EFFECT","FV","FVSCHEDULE","INTRATE","IPMT","IRR","ISPMT","MDURATION","MIRR","NOMINAL","NPER","NPV","ODDFPRICE","ODDFYIELD","ODDLPRICE","ODDLYIELD","PDURATION","PMT","PPMT","PRICE","PRICEDISC","PRICEMAT","PV","RATE","RECEIVED","RRI","SLN","SYD","TBILLEQ","TBILLPRICE","TBILLYIELD","VDB","XIRR","XNPV","YIELD","YIELDDISC","YIELDMAT",
+  // information
+  "CELL","INFO","ISBLANK","ISERR","ISERROR","ISEVEN","ISFORMULA","ISLOGICAL","ISNA","ISNONTEXT","ISNUMBER","ISODD","ISREF","ISTEXT","N","NA","SHEET","SHEETS","TYPE",
+  // database
+  "DAVERAGE","DCOUNT","DCOUNTA","DGET","DMAX","DMIN","DPRODUCT","DSTDEV","DSTDEVP","DSUM","DVAR","DVARP",
+  // engineering
+  "BIN2DEC","BIN2HEX","BIN2OCT","BITAND","BITLSHIFT","BITOR","BITRSHIFT","BITXOR","COMPLEX","CONVERT","DEC2BIN","DEC2HEX","DEC2OCT","DELTA","ERF","ERFC","GESTEP","HEX2BIN","HEX2DEC","HEX2OCT","IMABS","IMAGINARY","IMREAL","OCT2BIN","OCT2DEC","OCT2HEX",
+  // web & cube
+  "ENCODEURL","FILTERXML","WEBSERVICE","CUBEKPIMEMBER","CUBEMEMBER","CUBEMEMBERPROPERTY","CUBERANKEDMEMBER","CUBESET","CUBESETCOUNT","CUBEVALUE"
+]);
+function isReserved(name){ return RESERVED.has((name || '').toUpperCase()); }
+
 // Excel function name: letters/digits/dot/underscore, not starting with a digit or dot.
 // No forced prefix — the user controls the entire name.
 function cleanName(s){ let n=(s||'').replace(/[^A-Za-z0-9_.]/g,''); if(/^[0-9.]/.test(n)) n='_'+n; return n; }
 function renderPreview(){
   const friendly = ($('friendlyName').value||'Formula');
   const fnName = cleanName(friendly);
-  $('nameHint').innerHTML = "In Excel you'll type <b>="+esc(fnName)+"(…)</b>";
+  $('nameHint').innerHTML = isReserved(fnName)
+    ? '<span style="color:var(--danger)">⚠ <b>'+esc(fnName)+'</b> is a built-in Excel function — choose a different name.</span>'
+    : "In Excel you'll type <b>="+esc(fnName)+"(…)</b>";
   const measure = (measureCombo.getValue()) || 'the value';
   const names = paramNames();
   // tinted formula
@@ -262,6 +293,7 @@ async function saveFunction(){
   });
   const fnName = cleanName(friendly);
   if(!fnName){ showStatus('Use letters, numbers, dots or underscores for the formula name.'); return; }
+  if(isReserved(fnName)){ showStatus('“'+fnName+'” is a built-in Excel function — please choose a different name.'); return; }
   const dto = { FunctionName:fnName, MeasureName:'['+measure+']',
     DatasetId:CURRENT.DatasetId, TenantId:'', ModelName:CURRENT.ModelName||'', Parameters:params };
   try {
