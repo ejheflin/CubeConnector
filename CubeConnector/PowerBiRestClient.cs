@@ -189,10 +189,10 @@ namespace CubeConnector
                 string type = Val(r, "Type"); string cat = Val(r, "DataCategory");
                 if (type == "RowNumber" || cat == "RowNumber") continue;
                 md.Columns.Add(new ModelColumn { Table = Val(r, "Table"), Name = Val(r, "Name"),
-                    DataType = Val(r, "DataType"), IsHidden = Val(r, "IsHidden") == "True" });
+                    DataType = Val(r, "DataType"), IsHidden = Val(r, "IsHidden") == "True", Description = Val(r, "Description") });
             }
             foreach (var r in RunDax(accessToken, baseUrl, "EVALUATE INFO.VIEW.MEASURES()"))
-                md.Measures.Add(new ModelMeasure { Table = Val(r, "Table"), Name = Val(r, "Name") });
+                md.Measures.Add(new ModelMeasure { Table = Val(r, "Table"), Name = Val(r, "Name"), Description = Val(r, "Description") });
             return md;
         }
 

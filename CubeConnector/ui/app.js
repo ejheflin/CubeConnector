@@ -10,7 +10,7 @@ function $(id){ return document.getElementById(id); }
 
 /* ---------- searchable combobox ---------- */
 function Combo(mount, opts){
-  let items = [], value = null, activeIdx = -1;
+  let items = [], value = null, activeIdx = -1, collapsed = new Set();
   const root = document.createElement('div'); root.className = 'combo';
   root.innerHTML =
     `<div class="combo-trigger field" tabindex="0"><span class="val placeholder"></span><span class="chev">▾</span></div>
@@ -52,11 +52,18 @@ function Combo(mount, opts){
     optsEl.innerHTML = '';
     if(!list.length){ optsEl.innerHTML = `<div class="combo-none">No matches</div>`; return; }
     if(opts.grouped){
+      const searching = !!q.trim();
       const groups = {};
       list.forEach(it=>{ const g=it.group||''; (groups[g]=groups[g]||[]).push(it); });
       Object.keys(groups).forEach(g=>{
-        if(g){ const h=document.createElement('div'); h.className='combo-group'; h.textContent=g; optsEl.appendChild(h); }
-        groups[g].forEach(it=>optsEl.appendChild(optEl(it)));
+        const isCol = !searching && collapsed.has(g);
+        if(g){
+          const h=document.createElement('div'); h.className='combo-group';
+          h.innerHTML = `<span class="gchev">${isCol?'▸':'▾'}</span><span class="gname">${esc(g)}</span><span class="gcount">${groups[g].length}</span>`;
+          h.addEventListener('click', ()=>{ if(collapsed.has(g)) collapsed.delete(g); else collapsed.add(g); render(search.value); });
+          optsEl.appendChild(h);
+        }
+        if(!isCol) groups[g].forEach(it=>optsEl.appendChild(optEl(it)));
       });
     } else list.forEach(it=>optsEl.appendChild(optEl(it)));
   }
@@ -64,7 +71,7 @@ function Combo(mount, opts){
   function choose(it, fromUser){ value = it.value; setLabel(it.label); if(fromUser && opts.onSelect) opts.onSelect(it.value, it); }
 
   return {
-    setItems(list){ items = list || []; },
+    setItems(list){ items = list || []; if(opts.defaultCollapsed) collapsed = new Set(items.map(i=>i.group||'')); },
     getValue(){ return value; },
     setValueLabel(v, label){ value = v; setLabel(label); },
     selectByValue(v){ const it = items.find(x=>x.value===v); if(it){ choose(it, false); return it; } return null; },
@@ -74,7 +81,7 @@ function Combo(mount, opts){
 
 /* ---------- boot ---------- */
 async function boot(){
-  modelCombo = Combo($('modelCombo'), { placeholder:'Choose your data…', searchPlaceholder:'Search models or workspaces…', grouped:true, onSelect:onModelPicked });
+  modelCombo = Combo($('modelCombo'), { placeholder:'Choose your data…', searchPlaceholder:'Search models or workspaces…', grouped:true, defaultCollapsed:true, onSelect:onModelPicked });
   measureCombo = Combo($('measureCombo'), { placeholder:'Choose a number…', searchPlaceholder:'Search measures…', grouped:true,
     onSelect:(v)=>{ CURRENT.MeasureName = '['+v+']'; renderPreview(); } });
   try { const a = await call(cc.GetAccount()); $('account').textContent = 'Signed in: ' + (a.upn||'(unknown)'); }
@@ -141,7 +148,7 @@ async function loadMeasures(id, wsId){
   measureCombo.setItems([{ value:'', label:'Loading measures…' }]);
   try { MODEL = await call(cc.GetModel(id, wsId)); }
   catch(e){ MODEL = { measures:[], columns:[] }; measureCombo.setItems([]); showStatus("Couldn't read this model — you may not have access."); renderFilters(); return; }
-  measureCombo.setItems((MODEL.measures||[]).map(m => ({ value:m.Name, label:m.Name, group:m.Table || 'Measures' })));
+  measureCombo.setItems((MODEL.measures||[]).map(m => ({ value:m.Name, label:m.Name, group:m.Table || 'Measures', sub:m.Description||'' })));
   renderFilters(); renderPreview();
 }
 
@@ -153,7 +160,7 @@ function renderFilters(){
   const wrap = $('filterList'); wrap.innerHTML='';
   const cols = MODEL.columns || [];
   // field options grouped by table, for the searchable field picker
-  const fieldItems = cols.map(c => ({ value:`${c.Table}||${c.Name}||${c.DataType}`, label:c.Name, group:c.Table }));
+  const fieldItems = cols.map(c => ({ value:`${c.Table}||${c.Name}||${c.DataType}`, label:c.Name, group:c.Table, sub:c.Description||'' }));
   CURRENT.Parameters.filter(p=>!p._isEnd).forEach(p=>{
     const idx = CURRENT.Parameters.indexOf(p);
     const card = document.createElement('div'); card.className='filter-card'; card.dataset.idx = idx;
