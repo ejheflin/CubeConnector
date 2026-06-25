@@ -422,3 +422,6 @@ Example.xlsx
 
 # Release packaging output
 release/
+
+# Internal planning docs — kept local, not published
+docs/superpowers/
