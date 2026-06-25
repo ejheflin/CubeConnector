@@ -60,7 +60,7 @@ function Combo(mount, opts){
         if(g){
           const h=document.createElement('div'); h.className='combo-group';
           h.innerHTML = `<span class="gchev">${isCol?'▸':'▾'}</span><span class="gname">${esc(g)}</span><span class="gcount">${groups[g].length}</span>`;
-          h.addEventListener('click', ()=>{ if(collapsed.has(g)) collapsed.delete(g); else collapsed.add(g); render(search.value); });
+          h.addEventListener('click', e=>{ e.stopPropagation(); if(collapsed.has(g)) collapsed.delete(g); else collapsed.add(g); render(search.value); });
           optsEl.appendChild(h);
         }
         if(!isCol) groups[g].forEach(it=>optsEl.appendChild(optEl(it)));
@@ -81,7 +81,7 @@ function Combo(mount, opts){
 
 /* ---------- boot ---------- */
 async function boot(){
-  modelCombo = Combo($('modelCombo'), { placeholder:'Choose your data…', searchPlaceholder:'Search models or workspaces…', grouped:true, defaultCollapsed:true, onSelect:onModelPicked });
+  modelCombo = Combo($('modelCombo'), { placeholder:'Choose your data…', searchPlaceholder:'Search models or workspaces…', grouped:true, onSelect:onModelPicked });
   measureCombo = Combo($('measureCombo'), { placeholder:'Choose a number…', searchPlaceholder:'Search measures…', grouped:true,
     onSelect:(v)=>{ CURRENT.MeasureName = '['+v+']'; renderPreview(); } });
   try { const a = await call(cc.GetAccount()); $('account').textContent = 'Signed in: ' + (a.upn||'(unknown)'); }
