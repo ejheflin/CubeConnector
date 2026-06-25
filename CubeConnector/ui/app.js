@@ -224,9 +224,12 @@ function suggest(f){ return (f||'param').replace(/[^A-Za-z0-9]/g,'').toLowerCase
 function paramNames(){
   return CURRENT.Parameters.map(p => p.Name || suggestName(p.FieldName, p._kind) || 'value');
 }
+// Excel function name: letters/digits/dot/underscore, not starting with a digit or dot.
+// No forced prefix — the user controls the entire name.
+function cleanName(s){ let n=(s||'').replace(/[^A-Za-z0-9_.]/g,''); if(/^[0-9.]/.test(n)) n='_'+n; return n; }
 function renderPreview(){
   const friendly = ($('friendlyName').value||'Formula');
-  const fnName = 'CC.' + friendly.replace(/[^A-Za-z0-9_]/g,'');
+  const fnName = cleanName(friendly);
   $('nameHint').innerHTML = "In Excel you'll type <b>="+esc(fnName)+"(…)</b>";
   const measure = (measureCombo.getValue()) || 'the value';
   const names = paramNames();
@@ -257,7 +260,9 @@ async function saveFunction(){
       IsOptional: true
     });
   });
-  const dto = { FunctionName:'CC.'+friendly.replace(/[^A-Za-z0-9_]/g,''), MeasureName:'['+measure+']',
+  const fnName = cleanName(friendly);
+  if(!fnName){ showStatus('Use letters, numbers, dots or underscores for the formula name.'); return; }
+  const dto = { FunctionName:fnName, MeasureName:'['+measure+']',
     DatasetId:CURRENT.DatasetId, TenantId:'', ModelName:CURRENT.ModelName||'', Parameters:params };
   try {
     await call(cc.SaveFunction(JSON.stringify(dto)));
@@ -275,7 +280,7 @@ async function editFunction(name){
   const filterToKind = { List:'match', RangeStart:'start', RangeEnd:'end' };
   CURRENT.Parameters = (f.Parameters||[]).map(p=>({ ...p, _kind: filterToKind[p.FilterType] || 'match' }));
   showEditor();
-  $('friendlyName').value = name.replace(/^CC\./,'');
+  $('friendlyName').value = name;
   const measName = (f.MeasureName||'').replace(/^\[|\]$/g,'');
   measureCombo.setValueLabel(measName, measName);   // instant — before measures load
   CURRENT.MeasureName = f.MeasureName;
