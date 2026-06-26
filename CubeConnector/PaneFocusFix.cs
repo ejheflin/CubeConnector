@@ -71,7 +71,7 @@ namespace CubeConnector
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                          "CubeConnector", "focusfix.log");
 
-        private static void Log(string msg)
+        internal static void Log(string msg)
         {
             try
             {

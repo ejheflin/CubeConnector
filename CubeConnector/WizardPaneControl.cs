@@ -65,7 +65,15 @@ namespace CubeConnector
 
                 UiHost.AttachEmbeddedUi(_web.CoreWebView2, env);
                 _web.CoreWebView2.Navigate("https://cubeconnector.ui/index.html");
-                PaneFocusFix.Install(_web.Handle);
+
+                // WinEvent OUTOFCONTEXT callbacks are delivered via the installing thread's message
+                // loop. This async continuation may be off the UI thread (which would explain zero
+                // callbacks), so install on the control's UI thread.
+                IntPtr h = _web.Handle;
+                PaneFocusFix.Log("InitAsync tid=" + System.Threading.Thread.CurrentThread.ManagedThreadId +
+                                 " InvokeRequired=" + this.InvokeRequired);
+                if (this.InvokeRequired) this.BeginInvoke((Action)(() => PaneFocusFix.Install(h)));
+                else PaneFocusFix.Install(h);
             }
             catch (Exception ex)
             {
