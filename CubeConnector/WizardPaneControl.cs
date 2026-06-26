@@ -39,6 +39,7 @@ namespace CubeConnector
             _web.Dock = DockStyle.Fill;
             Controls.Add(_web);
             Load += async (s, e) => await InitAsync();
+            HandleDestroyed += (s, e) => PaneFocusFix.Uninstall();
         }
 
         private async System.Threading.Tasks.Task InitAsync()
@@ -64,6 +65,7 @@ namespace CubeConnector
 
                 UiHost.AttachEmbeddedUi(_web.CoreWebView2, env);
                 _web.CoreWebView2.Navigate("https://cubeconnector.ui/index.html");
+                PaneFocusFix.Install(_web.Handle);
             }
             catch (Exception ex)
             {

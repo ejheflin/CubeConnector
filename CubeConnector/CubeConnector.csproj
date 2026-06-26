@@ -176,6 +176,7 @@
     <Compile Include="PowerBiAuth.cs" />
     <Compile Include="PowerBiRestClient.cs" />
     <Compile Include="WizardBridge.cs" />
+    <Compile Include="PaneFocusFix.cs" />
     <Compile Include="UiHost.cs" />
     <Compile Include="AutoRefreshManager.cs" />
     <Compile Include="RuntimeBootstrap.cs" />
