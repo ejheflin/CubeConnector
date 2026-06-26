@@ -68,8 +68,10 @@ namespace CubeConnector
             var app = (Microsoft.Office.Interop.Excel.Application)ExcelDna.Integration.ExcelDnaUtil.Application;
             app.CalculateFullRebuild();
 
-            // Step 4: Call normal refresh to refill the cache
-            RefreshInternal(null, null);
+            // Step 4: Call normal refresh to refill the cache.
+            // offerForce:false — this IS the forced pass; if nothing needs refreshing afterward,
+            // return quietly instead of re-prompting (which would loop back into here).
+            RefreshInternal(null, null, offerForce: false);
         }
 
         public void RefreshSheet(Excel.Worksheet sheet)
@@ -94,7 +96,7 @@ namespace CubeConnector
             RefreshInternal(null, range);
         }
 
-        private void RefreshInternal(Excel.Worksheet targetSheet, Excel.Range targetRange)
+        private void RefreshInternal(Excel.Worksheet targetSheet, Excel.Range targetRange, bool offerForce = true)
         {
             // Store original calculation mode
             Excel.XlCalculation originalCalcMode = xlApp.Calculation;
@@ -109,7 +111,9 @@ namespace CubeConnector
 
                 if (cellsToRefresh.Count == 0)
                 {
-                    if (silent) return;   // background auto-refresh: nothing to do, stay quiet
+                    // background auto-refresh, or an already-forced pass: don't prompt
+                    // (the forced pass re-prompting here is what caused the pop-up loop).
+                    if (silent || !offerForce) return;
 
                     string scope = targetRange != null ? "in selection" :
                                    targetSheet != null ? $"on sheet '{targetSheet.Name}'" :
