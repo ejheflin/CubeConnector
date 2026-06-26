@@ -78,7 +78,9 @@ namespace CubeConnector
         {
             string tableName = paramConfig.TableName;
             string fieldName = paramConfig.FieldName;
-            string fullField = $"{tableName}[{fieldName}]";
+            // Always single-quote the table name: DAX requires it for reserved/edge names
+            // (e.g. a table literally called 'Name') and it's harmless for ordinary names.
+            string fullField = $"'{tableName.Replace("'", "''")}'[{fieldName}]";
 
             switch (paramConfig.FilterType)
             {

@@ -523,7 +523,8 @@ namespace CubeConnector
         {
             string table = paramConfig.TableName;
             string field = paramConfig.FieldName;
-            string fullField = $"{table}[{field}]";
+            // Always single-quote the table name (required for reserved/edge names like 'Name').
+            string fullField = $"'{table.Replace("'", "''")}'[{field}]";
 
             // Handle different filter types
             switch (paramConfig.FilterType)
