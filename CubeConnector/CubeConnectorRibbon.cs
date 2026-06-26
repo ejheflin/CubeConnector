@@ -38,29 +38,35 @@ namespace CubeConnector
         <tabs>
             <tab idMso='TabData'>
                 <group id='CubeConnectorGroup' label='CubeConnector' insertAfterMso='GroupRefreshAll'>
-                    <splitButton id='RefreshCCSplitButton' size='large'>
-                        <button id='RefreshCCButton' 
-                                label='Refresh'
-                                onAction='OnRefreshClicked'
-                                image='CubeIcon' />
-                        <menu id='RefreshCCMenu'>
-                            <button id='ClearCacheBtn'
-                                    label='Clear Cache'
-                                    onAction='OnClearCacheClicked'
-                                    imageMso='RecordsDeleteRecord' />
-                            <button id='DrillToDetailsBtn' 
-                                    label='Drill to Details' 
-                                    onAction='OnDrillToDetailsClicked'
-                                    imageMso='ControlWizards' />
-                            <!-- Drill to Pivot temporarily removed pending further testing.
-                                 Restore this button (and the context-menu item in
-                                 DynamicFunctionRegistration.AddContextMenuItems) to re-enable. -->
-                            <button id='ManageFormulasBtn'
-                                    label='Manage Formulas'
-                                    onAction='OnManageFormulasClicked'
-                                    imageMso='TableInsertDialog' />
-                        </menu>
-                    </splitButton>
+                    <button id='RefreshCCButton' size='large'
+                            label='Refresh'
+                            onAction='OnRefreshClicked'
+                            image='CubeIcon'
+                            screentip='Refresh CubeConnector values' />
+                    <toggleButton id='AutoRefreshToggle'
+                            label='Auto-refresh'
+                            onAction='OnAutoRefreshToggled'
+                            getPressed='GetAutoRefreshPressed'
+                            imageMso='RefreshStatus'
+                            screentip='Auto-refresh'
+                            supertip='Automatically refresh about 3 seconds after you finish editing.' />
+                    <button id='DrillToDetailsBtn'
+                            label='Drill to Details'
+                            onAction='OnDrillToDetailsClicked'
+                            imageMso='ControlWizards' />
+                    <button id='ManageFormulasBtn'
+                            label='Manage Formulas'
+                            onAction='OnManageFormulasClicked'
+                            imageMso='TableInsertDialog' />
+                    <button id='ClearCacheBtn'
+                            label='Clear Cache'
+                            onAction='OnClearCacheClicked'
+                            imageMso='RecordsDeleteRecord' />
+                    <!-- Drill to Pivot temporarily removed pending further testing.
+                         Restore a <button id='DrillToPivotBtn' label='Drill to Pivot'
+                         onAction='OnDrillToPivotClicked' imageMso='PivotTableInsert' /> here
+                         (next to Drill to Details) and the context-menu item in
+                         DynamicFunctionRegistration.AddContextMenuItems to re-enable. -->
                 </group>
             </tab>
         </tabs>
@@ -91,16 +97,22 @@ namespace CubeConnector
 
         public void OnRefreshClicked(IRibbonControl control)
         {
+            // First-run nudge: with no formulas yet, guide the user to setup instead of a no-op refresh.
+            var configs = ConfigurationStore.GetAllConfigs();
+            if (configs == null || configs.Count == 0)
+            {
+                var choice = System.Windows.Forms.MessageBox.Show(
+                    "You haven't set up any formulas yet. Open Manage Formulas to create one?",
+                    "CubeConnector",
+                    System.Windows.Forms.MessageBoxButtons.YesNo,
+                    System.Windows.Forms.MessageBoxIcon.Information);
+                if (choice == System.Windows.Forms.DialogResult.Yes) OpenManageFormulasPane();
+                return;
+            }
+
             try
             {
-                // Ensure prerequisites exist
-                EnsureConnectionExists();
-                EnsureCacheExists();
-
-                var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
-                var workbook = app.ActiveWorkbook;
-                var manager = new RefreshManager(app, workbook);
-                manager.RefreshAll();
+                DynamicFunctionRegistration.RefreshCore();
             }
             catch (Exception ex)
             {
@@ -149,9 +161,14 @@ namespace CubeConnector
 
         public void OnManageFormulasClicked(IRibbonControl control)
         {
+            OpenManageFormulasPane();
+        }
+
+        private static void OpenManageFormulasPane()
+        {
             try
             {
-                // Start the dataset prefetch the instant the button is clicked, so the model
+                // Start the dataset prefetch the instant the pane opens, so the model
                 // list is ready by the time the user reaches the dropdown (idempotent + guarded).
                 System.Threading.Tasks.Task.Run(() => PowerBiRestClient.WarmDatasetCache());
 
@@ -172,6 +189,17 @@ namespace CubeConnector
                     "CubeConnector");
                 WizardWindow.ShowSingleton();
             }
+        }
+
+        // ---- Auto-refresh toggle (state persists across Excel restarts) ----
+        public bool GetAutoRefreshPressed(IRibbonControl control)
+        {
+            return AutoRefreshManager.Enabled;
+        }
+
+        public void OnAutoRefreshToggled(IRibbonControl control, bool pressed)
+        {
+            AutoRefreshManager.SetEnabled(pressed);
         }
 
         private static void EnsureConnectionExists()
