@@ -89,7 +89,7 @@ namespace CubeConnector
             uint pid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
             _hook = SetWinEventHook(EVENT_OBJECT_FOCUS, EVENT_OBJECT_SELECTIONWITHIN, IntPtr.Zero,
                 _callback, pid, 0, WINEVENT_OUTOFCONTEXT);
-            Log("INSTALL hook=" + _hook + " webview=" + webViewHwnd + " pid=" + pid);
+            Log("INSTALL hook=" + _hook + " webview=" + webViewHwnd + " pid=" + pid + " tid=" + GetCurrentThreadId());
         }
 
         public static void Uninstall()
@@ -102,6 +102,10 @@ namespace CubeConnector
         private static void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd,
             int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
         {
+            // DIAGNOSTIC: log EVERY callback invocation (before any guards) so we can tell whether
+            // the hook fires at all, on which thread, and for which windows.
+            try { Log($"HIT tid={GetCurrentThreadId()} evt=0x{eventType:X} hwnd=0x{hwnd.ToInt64():X} cls='{(hwnd != IntPtr.Zero ? GetClass(hwnd) : "(null)")}'"); } catch { }
+
             if (_busy || _webViewHwnd == IntPtr.Zero || hwnd == IntPtr.Zero) return;
             try
             {
