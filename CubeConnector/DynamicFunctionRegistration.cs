@@ -132,13 +132,13 @@ namespace CubeConnector
         /// ensure prerequisites, then refresh only the cells that need it. Throws on failure —
         /// callers decide how to surface errors.
         /// </summary>
-        public static void RefreshCore()
+        public static void RefreshCore(bool silent = false)
         {
             EnsureConnectionExists();
             EnsureCacheExists();
             var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
             var workbook = app.ActiveWorkbook;
-            new RefreshManager(app, workbook).RefreshAll();
+            new RefreshManager(app, workbook, silent).RefreshAll();
         }
         /// <summary>
         /// Register all functions from configuration

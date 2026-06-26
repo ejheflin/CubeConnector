@@ -40,10 +40,15 @@ namespace CubeConnector
         // Minimum queries needed to create a pool (otherwise treat as orphans)
         private const int MIN_POOL_SIZE = 3;
 
-        public RefreshManager(Excel.Application application, Excel.Workbook workbook)
+        // silent = true suppresses all user-facing dialogs and side effects (clipboard),
+        // so background auto-refresh stays quiet and non-disruptive.
+        private readonly bool silent;
+
+        public RefreshManager(Excel.Application application, Excel.Workbook workbook, bool silent = false)
         {
             this.xlApp = application;
             this.workbook = workbook;
+            this.silent = silent;
         }
 
         public void RefreshAll()
@@ -104,6 +109,8 @@ namespace CubeConnector
 
                 if (cellsToRefresh.Count == 0)
                 {
+                    if (silent) return;   // background auto-refresh: nothing to do, stay quiet
+
                     string scope = targetRange != null ? "in selection" :
                                    targetSheet != null ? $"on sheet '{targetSheet.Name}'" :
                                    "in workbook";
@@ -155,7 +162,8 @@ namespace CubeConnector
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error during refresh:\n\n{ex.Message}\n\n{ex.StackTrace}");
+                if (!silent)
+                    MessageBox.Show($"Error during refresh:\n\n{ex.Message}\n\n{ex.StackTrace}");
             }
             finally
             {
@@ -246,7 +254,8 @@ namespace CubeConnector
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Pooled query {i + 1}/{queryBatches.Count} FAILED:\n\n{ex.Message}\n\n{ex.StackTrace}");
+                    if (!silent)
+                        MessageBox.Show($"Pooled query {i + 1}/{queryBatches.Count} FAILED:\n\n{ex.Message}\n\n{ex.StackTrace}");
                     totalFailed++;
                 }
             }
@@ -272,7 +281,7 @@ namespace CubeConnector
                         string orphanQuery = DAXQueryBuilder.BuildBatchQuery(config, batchItems);
 
                         //MessageBox.Show($"Orphan query for {funcGroup.Key}:\n\n{orphanQuery.Substring(0, Math.Min(1000, orphanQuery.Length))}...", "Debug Query");
-                        Clipboard.SetText(orphanQuery);  // Copy to clipboard so you can test in DAX Studio
+                        if (!silent) Clipboard.SetText(orphanQuery);  // debug aid: copy DAX for DAX Studio (skip during auto-refresh)
 
 
                         var results = ExecuteBatchQuery(orphanQuery, connName, querySheetName, listObjName);
@@ -282,7 +291,8 @@ namespace CubeConnector
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Orphan batch failed for {funcGroup.Key}:\n\n{ex.Message}");
+                        if (!silent)
+                            MessageBox.Show($"Orphan batch failed for {funcGroup.Key}:\n\n{ex.Message}");
                         totalFailed += funcGroup.Count();
                     }
                 }

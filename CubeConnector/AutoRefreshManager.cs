@@ -96,7 +96,7 @@ namespace CubeConnector
             {
                 prevEvents = _app.EnableEvents;
                 _app.EnableEvents = false;     // suppress events while the refresh writes cells
-                DynamicFunctionRegistration.RefreshCore();
+                DynamicFunctionRegistration.RefreshCore(silent: true);   // no popups/clipboard during background refresh
             }
             catch { /* auto-refresh must never throw a modal error mid-edit */ }
             finally
