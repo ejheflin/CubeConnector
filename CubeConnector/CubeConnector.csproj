@@ -177,6 +177,7 @@
     <Compile Include="PowerBiRestClient.cs" />
     <Compile Include="WizardBridge.cs" />
     <Compile Include="UiHost.cs" />
+    <Compile Include="AutoRefreshManager.cs" />
     <Compile Include="RuntimeBootstrap.cs" />
     <Compile Include="WizardPaneControl.cs" />
     <Compile Include="WizardWindow.cs" />

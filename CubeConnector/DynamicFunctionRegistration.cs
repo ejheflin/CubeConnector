@@ -57,6 +57,9 @@ namespace CubeConnector
                 // Store Excel Application reference for cache access
                 ExcelApp = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
 
+                // Start auto-refresh if the user left it enabled (persists across restarts).
+                AutoRefreshManager.Initialize(ExcelApp);
+
                 var configs = ConfigurationStore.GetAllConfigs();
                 if (configs == null || configs.Count == 0) return;
 
@@ -113,6 +116,8 @@ namespace CubeConnector
         {
             try
             {
+                AutoRefreshManager.Detach();
+
                 var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
                 var cellMenu = app.CommandBars["Cell"];
 
@@ -121,6 +126,19 @@ namespace CubeConnector
                 try { cellMenu.Controls["CubeConnector - Refresh Cache"].Delete(); } catch { }
             }
             catch { }
+        }
+        /// <summary>
+        /// The shared refresh pipeline used by both the ribbon Refresh button and auto-refresh:
+        /// ensure prerequisites, then refresh only the cells that need it. Throws on failure —
+        /// callers decide how to surface errors.
+        /// </summary>
+        public static void RefreshCore()
+        {
+            EnsureConnectionExists();
+            EnsureCacheExists();
+            var app = (Microsoft.Office.Interop.Excel.Application)ExcelDnaUtil.Application;
+            var workbook = app.ActiveWorkbook;
+            new RefreshManager(app, workbook).RefreshAll();
         }
         /// <summary>
         /// Register all functions from configuration
