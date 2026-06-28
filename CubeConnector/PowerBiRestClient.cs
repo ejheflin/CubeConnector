@@ -196,6 +196,27 @@ namespace CubeConnector
             return md;
         }
 
+        /// <summary>
+        /// One example value from a column: EVALUATE TOPN(1, VALUES('table'[column])). Cheap on any
+        /// table size (columnar, dictionary-backed). Returns null on blank/none/error (best-effort).
+        /// </summary>
+        public static string GetSampleValue(string accessToken, string groupId, string datasetId, string table, string column)
+        {
+            try
+            {
+                string baseUrl = string.IsNullOrEmpty(groupId)
+                    ? PbiApi + "/datasets/" + datasetId + "/executeQueries"
+                    : PbiApi + "/groups/" + groupId + "/datasets/" + datasetId + "/executeQueries";
+                string tbl = "'" + (table ?? "").Replace("'", "''") + "'";
+                string col = "[" + (column ?? "").Replace("]", "]]") + "]";
+                var rows = RunDax(accessToken, baseUrl, "EVALUATE TOPN(1, VALUES(" + tbl + col + "))");
+                if (rows.Count == 0) return null;
+                foreach (var kv in rows[0]) return string.IsNullOrEmpty(kv.Value) ? null : kv.Value;
+                return null;
+            }
+            catch { return null; }
+        }
+
         // executeQueries returns results[0].tables[0].rows: [{ "INFO.VIEW.COLUMNS()[Name]": val, ... }]
         private static List<Dictionary<string,string>> RunDax(string token, string url, string dax)
         {

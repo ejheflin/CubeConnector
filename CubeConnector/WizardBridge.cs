@@ -42,6 +42,7 @@ namespace CubeConnector
         {
             PowerBiRestClient.ClearCache();
             _modelCache.Clear();
+            _sampleCache.Clear();
         }
 
         public string ListDatasets()
@@ -58,6 +59,10 @@ namespace CubeConnector
         // Per-dataset model metadata cache so re-opening / switching back to a model is instant.
         private static readonly Dictionary<string, ModelMetadata> _modelCache =
             new Dictionary<string, ModelMetadata>(StringComparer.OrdinalIgnoreCase);
+
+        // Per-column example-value cache (key: datasetId|table|column). Null/blank is cached too.
+        private static readonly Dictionary<string, string> _sampleCache =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public string GetModel(string datasetId, string groupId)
         {
@@ -85,6 +90,23 @@ namespace CubeConnector
                     columns = md.Columns.Where(c => !c.IsHidden).Select(c => new { c.Table, c.Name, c.DataType, c.Description })
                 });
             } catch (Exception e) { return Err(e); }
+        }
+
+        public string GetSampleValue(string datasetId, string groupId, string table, string column)
+        {
+            try
+            {
+                string key = (datasetId ?? "") + "|" + (table ?? "") + "|" + (column ?? "");
+                if (!_sampleCache.TryGetValue(key, out string val))
+                {
+                    string token = PowerBiAuth.GetAccessToken(out _, out string err);
+                    if (token == null) return J.Serialize(new { error = err ?? "sign-in failed" });
+                    val = PowerBiRestClient.GetSampleValue(token, groupId, datasetId, table, column);
+                    _sampleCache[key] = val;   // cache null/blank too (don't re-query)
+                }
+                return Ok(new { value = val });
+            }
+            catch (Exception e) { return Err(e); }
         }
 
         public string GetFunctions()
