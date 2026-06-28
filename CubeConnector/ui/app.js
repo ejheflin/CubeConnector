@@ -169,6 +169,7 @@ function renderFilters(){
     card.innerHTML =
       `<div class="row"><span class="drag" title="Drag to reorder">⠿</span><div class="fieldcombo" style="flex:1"></div>
          <button class="icon-btn" title="Remove" onclick="removeFilter(${idx})">✕</button></div>
+       <div class="row sample-row">${sampleHint(p)}</div>
        <div class="row">
          <span class="seg">
            <label class="${p._kind==='match'?'on':''}"><input type="radio" name="k${idx}" hidden ${p._kind==='match'?'checked':''} onchange="setKind(${idx},'match')">Match</label>
@@ -207,7 +208,29 @@ function wireDrag(card){
 }
 function suggestName(field, kind){ const base=suggest(field); return base + (kind==='start'?'_start':kind==='end'?'_end':''); }
 function setField(i,v){ const [t,f,dt]=v.split('||'); const p=CURRENT.Parameters[i]; p.TableName=t; p.FieldName=f;
-  p.DataType=mapType(dt); if(!p.Name) p.Name=suggestName(f, p._kind); renderFilters(); renderPreview(); }
+  p.DataType=mapType(dt); if(!p.Name) p.Name=suggestName(f, p._kind); fetchSample(i); renderFilters(); renderPreview(); }
+
+function truncate(s,n){ s=String(s); return s.length>n ? s.slice(0,n)+'…' : s; }
+// Inline "e.g. <value>" hint for a filter's chosen field. '' = nothing, '…' = loading.
+function sampleHint(p){
+  if(!p.FieldName) return '';
+  if(p._sample===undefined) return '<span class="sample">…</span>';
+  if(typeof p._sample==='string' && p._sample!=='') return '<span class="sample">e.g. '+esc(truncate(p._sample,40))+'</span>';
+  return '';
+}
+// Fetch one example value for the field at index i (async, cached server-side, stale-guarded).
+async function fetchSample(i){
+  const p = CURRENT.Parameters[i];
+  if(!p || !p.TableName || !p.FieldName || !CURRENT.DatasetId){ if(p) p._sample=null; return; }
+  const key = p.TableName+'||'+p.FieldName;
+  p._sampleKey = key; p._sample = undefined;   // loading
+  try {
+    const r = await call(cc.GetSampleValue(CURRENT.DatasetId, CURRENT._group||'', p.TableName, p.FieldName));
+    if(p._sampleKey !== key) return;            // field changed since we asked — ignore stale result
+    p._sample = (r.value===undefined || r.value===null) ? null : String(r.value);
+  } catch(e){ if(p._sampleKey===key) p._sample = null; }
+  renderFilters(); renderPreview();
+}
 function setName(i,v){ CURRENT.Parameters[i].Name=v; renderPreview(); }
 function setKind(i,k){
   const p = CURRENT.Parameters[i];
@@ -268,7 +291,11 @@ function renderPreview(){
   $('formula').innerHTML = `<span class="fn">=${esc(fnName)}</span>(` +
     names.map(n=>`<span class="arg">${esc(n)}</span>`).join(', ') + ')';
   $('explain').innerHTML = `Returns <b>${esc(measure)}</b>` + (names.length? `, filtered by ${esc(names.join(', '))}.` : '.');
-  const ex = CURRENT.Parameters.map(p => p.DataType==='date' ? '"1/1/2025"' : p.DataType==='number' ? '"4000"' : '"East"');
+  const ex = CURRENT.Parameters.map(p => {
+    const s = (typeof p._sample==='string' && p._sample!=='') ? p._sample : null;
+    if(s !== null) return p.DataType==='number' ? esc(s) : '"'+esc(s)+'"';
+    return p.DataType==='date' ? '"1/1/2025"' : p.DataType==='number' ? '"4000"' : '"East"';
+  });
   $('example').innerHTML = names.length
     ? 'e.g. <span class="lit">=' + esc(fnName) + '(' + ex.join(', ') + ')</span>'
     : '';

@@ -183,6 +183,9 @@ h2.title { font-size: 17px; font-weight: 650; letter-spacing: -.02em; margin-bot
 .seg label.on { background: var(--accent); color: #fff; }
 .icon-btn { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 13px; padding: 2px 5px; border-radius: 6px; }
 .icon-btn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.sample { font-size: 11px; color: var(--faint); }
+.sample-row { min-height: 0; }
+.sample-row:empty { display: none; }
 
 /* THE SIGNATURE — Excel formula bar */
 .formula-bar { margin-top: 16px; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
