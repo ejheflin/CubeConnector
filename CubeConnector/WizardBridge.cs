@@ -25,16 +25,18 @@ namespace CubeConnector
 
         public string SignInDifferent()
         {
-            try { string t = PowerBiAuth.SignInAsDifferentAccount(out string err);
-                  if (t == null) return J.Serialize(new { error = err });
-                  ClearCaches();
-                  return Ok(new { upn = PowerBiAuth.GetUpnFromToken(t) }); }
-            catch (Exception e) { return Err(e); }
+            try {
+                PowerBiAuth.PrepareDifferentAccount();
+                string t = PowerBiAuth.AcquireToken(true, System.Threading.CancellationToken.None, out _, out string err);
+                if (t == null) return J.Serialize(new { error = err });
+                ClearCaches();
+                return Ok(new { upn = PowerBiAuth.GetUpnFromToken(t) });
+            } catch (Exception e) { return Err(e); }
         }
 
         public string UseWindowsAccount()
         {
-            try { PowerBiAuth.UseWindowsAccount(); ClearCaches(); return GetAccount(); } catch (Exception e) { return Err(e); }
+            try { PowerBiAuth.PrepareWindowsAccount(); ClearCaches(); return GetAccount(); } catch (Exception e) { return Err(e); }
         }
 
         // Identity changed -> the cached dataset list and model metadata are for the old account.

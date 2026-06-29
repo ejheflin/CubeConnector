@@ -24,6 +24,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace CubeConnector
 {
@@ -69,51 +70,48 @@ namespace CubeConnector
             try { Directory.CreateDirectory(AppDataDir); File.WriteAllText(ModeFile, mode); } catch { }
         }
 
-        /// <summary>
-        /// Returns a Power BI access token. Tries the cached refresh token first (silent);
-        /// falls back to interactive browser sign-in. Returns null on failure.
-        /// </summary>
+        /// <summary>Back-compat: blocking acquire with no cancellation.</summary>
         public static string GetAccessToken(out string source, out string error)
+            => AcquireToken(false, CancellationToken.None, out source, out error);
+
+        /// <summary>
+        /// Acquire a Power BI access token, honoring cancellation. forceInteractive skips the
+        /// silent WAM/cached steps and goes straight to the browser flow. Intended to run on a
+        /// background thread (the interactive wait can be long but is now cancelable).
+        /// </summary>
+        public static string AcquireToken(bool forceInteractive, CancellationToken ct, out string source, out string error)
         {
             source = null; error = null;
-            bool preferBrowser = GetMode() == "browser";
-
-            // 1. Zero-click SSO via WAM (Windows session identity) -- unless the user has
-            //    explicitly chosen a specific (different) account.
-            if (!preferBrowser)
+            if (!forceInteractive)
             {
-                string wamTok = TryWamSilent(out _);
-                if (!string.IsNullOrEmpty(wamTok)) { source = "WAM zero-click SSO"; return wamTok; }
+                bool preferBrowser = GetMode() == "browser";
+                if (!preferBrowser)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    string wamTok = TryWamSilent(ct, out _);
+                    if (!string.IsNullOrEmpty(wamTok)) { source = "WAM zero-click SSO"; return wamTok; }
+                }
+                ct.ThrowIfCancellationRequested();
+                string cachedTok = TryCachedRefresh();
+                if (!string.IsNullOrEmpty(cachedTok)) { source = "silent (cached refresh token)"; return cachedTok; }
             }
-
-            // 2. Silent: redeem a cached refresh token (the chosen browser account).
-            string cachedTok = TryCachedRefresh();
-            if (!string.IsNullOrEmpty(cachedTok)) { source = "silent (cached refresh token)"; return cachedTok; }
-
-            // 3. Interactive: browser auth-code + PKCE.
-            string itok = Interactive(out string ierr);
+            ct.ThrowIfCancellationRequested();
+            string itok = Interactive(ct, out string ierr);
             if (!string.IsNullOrEmpty(itok)) { source = "interactive (browser)"; return itok; }
             error = ierr ?? "Authentication failed.";
             return null;
         }
 
-        /// <summary>
-        /// Force sign-in as a specific (possibly different) account via the browser, and
-        /// REMEMBER that choice so future silent calls use it instead of the Windows identity.
-        /// Returns the access token, or null (with error) on failure.
-        /// </summary>
-        public static string SignInAsDifferentAccount(out string error)
+        /// <summary>Clear the cached refresh token and switch to browser-chosen-account mode.
+        /// Follow with AcquireToken(forceInteractive:true, …) on a background thread.</summary>
+        public static void PrepareDifferentAccount()
         {
-            error = null;
             SignOut();           // clear any cached refresh token
             SetMode("browser");  // stick to the browser-chosen account
-            string tok = Interactive(out string ierr);
-            if (string.IsNullOrEmpty(tok)) { error = ierr ?? "Sign-in failed."; return null; }
-            return tok;
         }
 
-        /// <summary>Revert to using the Windows logon identity (zero-click WAM) going forward.</summary>
-        public static void UseWindowsAccount()
+        /// <summary>Revert to the Windows logon identity (zero-click WAM) going forward.</summary>
+        public static void PrepareWindowsAccount()
         {
             SignOut();
             SetMode("wam");
@@ -195,7 +193,7 @@ namespace CubeConnector
         /// Runs out-of-process so the native broker never loads inside Excel. Returns
         /// null on any failure (helper missing, broker unavailable, no PRT, etc.).
         /// </summary>
-        private static string TryWamSilent(out string error)
+        private static string TryWamSilent(CancellationToken ct, out string error)
         {
             error = null;
             string exe = ResolveWamHelperPath();
@@ -214,9 +212,15 @@ namespace CubeConnector
                 };
                 using (var p = Process.Start(psi))
                 {
-                    string stdout = p.StandardOutput.ReadToEnd();
-                    p.WaitForExit(60000);
-
+                    // Wait up to 30s, honoring cancellation, without blocking uninterruptibly.
+                    int waited = 0;
+                    while (!p.WaitForExit(200))
+                    {
+                        waited += 200;
+                        if (ct.IsCancellationRequested) { try { if (!p.HasExited) p.Kill(); } catch { } error = "canceled"; return null; }
+                        if (waited >= 30000) { try { if (!p.HasExited) p.Kill(); } catch { } error = "WAM timed out"; return null; }
+                    }
+                    string stdout = p.StandardOutput.ReadToEnd();   // process exited; token output is small
                     foreach (var raw in stdout.Split('\n'))
                     {
                         string line = raw.Trim();
@@ -255,7 +259,7 @@ namespace CubeConnector
 
         // ---- interactive browser auth-code flow ----
 
-        private static string Interactive(out string error)
+        private static string Interactive(CancellationToken ct, out string error)
         {
             error = null;
             TcpListener listener = null;
@@ -280,10 +284,18 @@ namespace CubeConnector
                 var acceptTask = listener.AcceptTcpClientAsync();
                 Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
 
-                if (!acceptTask.Wait(TimeSpan.FromSeconds(180)))
+                try
                 {
-                    error = "Timed out waiting for the browser redirect.";
-                    return null;
+                    if (!acceptTask.Wait(180000, ct))
+                    {
+                        error = "Timed out waiting for the browser redirect.";
+                        return null;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    error = "Sign-in canceled.";
+                    return null;   // finally{} stops the listener, releasing the loopback
                 }
 
                 string requestLine;
