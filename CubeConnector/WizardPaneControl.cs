@@ -70,8 +70,6 @@ namespace CubeConnector
                 // loop. This async continuation may be off the UI thread (which would explain zero
                 // callbacks), so install on the control's UI thread.
                 IntPtr h = _web.Handle;
-                PaneFocusFix.Log("InitAsync tid=" + System.Threading.Thread.CurrentThread.ManagedThreadId +
-                                 " InvokeRequired=" + this.InvokeRequired);
                 if (this.InvokeRequired) this.BeginInvoke((Action)(() => PaneFocusFix.Install(h)));
                 else PaneFocusFix.Install(h);
             }
