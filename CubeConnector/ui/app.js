@@ -82,21 +82,43 @@ function Combo(mount, opts){
 }
 
 /* ---------- boot ---------- */
+let _authPoll = null;
+let _pendingAuthRetry = null;   // re-run once sign-in becomes ready
+
+function renderAccount(a){
+  const el = $('account'); const st = a && a.status;
+  if(st==='ready') el.innerHTML = 'Signed in: ' + esc(a.upn||'(unknown)');
+  else if(st==='signing-in') el.innerHTML = 'Signing in… <a onclick="cancelSignIn()">Cancel</a>';
+  else if(st==='error') el.innerHTML = 'Sign-in failed <a onclick="retrySignIn()">Retry</a>';
+  else el.innerHTML = 'Not signed in <a onclick="retrySignIn()">Sign in</a>';
+}
+function pollAuth(){
+  if(_authPoll) return;
+  _authPoll = setInterval(async ()=>{
+    let a; try { a = await call(cc.GetAuthState()); } catch(e){ return; }
+    renderAccount(a);
+    if(a.status!=='signing-in'){
+      clearInterval(_authPoll); _authPoll = null;
+      if(a.status==='ready' && _pendingAuthRetry){ const fn=_pendingAuthRetry; _pendingAuthRetry=null; fn(); }
+    }
+  }, 600);
+}
+function onReadyRetry(fn){ _pendingAuthRetry = fn; pollAuth(); }
+function cancelSignIn(){ call(cc.CancelSignIn()).then(renderAccount).catch(()=>{}); }
+function retrySignIn(){ call(cc.GetAccount()).then(a=>{ renderAccount(a); if(a.status==='signing-in') pollAuth(); }).catch(()=>{}); }
+
 async function boot(){
   modelCombo = Combo($('modelCombo'), { placeholder:'Choose your data…', searchPlaceholder:'Search models or workspaces…', grouped:true, onSelect:onModelPicked });
   measureCombo = Combo($('measureCombo'), { placeholder:'Choose a number…', searchPlaceholder:'Search measures…', grouped:true,
     onSelect:(v)=>{ CURRENT.MeasureName = '['+v+']'; renderPreview(); } });
-  try { const a = await call(cc.GetAccount()); $('account').textContent = 'Signed in: ' + (a.upn||'(unknown)'); }
+  try { const a = await call(cc.GetAccount()); renderAccount(a); if(a.status==='signing-in') pollAuth(); }
   catch(e){ $('account').textContent = 'Not signed in'; }
   await refreshLibrary();
 }
 
 async function switchAccount(){
-  try {
-    const r = await call(cc.SignInDifferent());
-    $('account').textContent = 'Signed in: ' + (r.upn||'(unknown)');
-    showStatus('Switched account. Pick a model to continue.');
-  } catch(e){ showStatus('Sign-in failed: ' + e.message); }
+  try { const a = await call(cc.SignInDifferent()); renderAccount(a); pollAuth(); showStatus('Signing in… pick a model once connected.'); }
+  catch(e){ showStatus('Sign-in failed: ' + e.message); }
 }
 
 /* ---------- library ---------- */
@@ -136,6 +158,7 @@ async function newFunction(){
 
 async function loadModels(){
   const o = await call(cc.ListDatasets());
+  if(o.needAuth){ modelCombo.setLoading(true); onReadyRetry(loadModels); return; }
   modelCombo.setItems((o.datasets||[]).map(d => ({
     value: d.Id, label: d.Name, group: d.WorkspaceName || 'My workspace', wsId: d.WorkspaceId || ''
   })));
@@ -149,8 +172,11 @@ function onModelPicked(id, it){
 
 async function loadMeasures(id, wsId){
   measureCombo.setLoading(true);
-  try { MODEL = await call(cc.GetModel(id, wsId)); }
+  let o;
+  try { o = await call(cc.GetModel(id, wsId)); }
   catch(e){ MODEL = { measures:[], columns:[] }; measureCombo.setItems([]); showStatus("Couldn't read this model — you may not have access."); renderFilters(); return; }
+  if(o.needAuth){ onReadyRetry(()=>loadMeasures(id, wsId)); return; }
+  MODEL = o;
   measureCombo.setItems((MODEL.measures||[]).map(m => ({ value:m.Name, label:m.Name, group:m.Table || 'Measures', sub:m.Description||'' })));
   renderFilters(); renderPreview();
 }
@@ -227,6 +253,7 @@ async function fetchSample(i){
   try {
     const r = await call(cc.GetSampleValue(CURRENT.DatasetId, CURRENT._group||'', p.TableName, p.FieldName));
     if(p._sampleKey !== key) return;            // field changed since we asked — ignore stale result
+    if(r.needAuth){ onReadyRetry(()=>fetchSample(i)); return; }   // retry once signed in
     p._sample = (r.value===undefined || r.value===null) ? null : String(r.value);
   } catch(e){ if(p._sampleKey===key) p._sample = null; }
   renderFilters(); renderPreview();
