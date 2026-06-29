@@ -38,11 +38,21 @@ namespace CubeConnector
         <tabs>
             <tab idMso='TabData'>
                 <group id='CubeConnectorGroup' label='CubeConnector' insertAfterMso='GroupRefreshAll'>
-                    <button id='RefreshCCButton' size='large'
-                            label='Refresh'
-                            onAction='OnRefreshClicked'
-                            image='CubeIcon'
-                            screentip='Refresh CubeConnector values' />
+                    <splitButton id='RefreshSplit' size='large'>
+                        <button id='RefreshCCButton'
+                                label='Refresh'
+                                onAction='OnRefreshClicked'
+                                image='CubeIcon'
+                                screentip='Refresh CubeConnector values' />
+                        <menu id='RefreshMenu'>
+                            <button id='ClearCacheBtn'
+                                    label='Clear Cache &amp; Refresh'
+                                    onAction='OnClearCacheClicked'
+                                    imageMso='RecordsDeleteRecord'
+                                    screentip='Clear cached values and refresh'
+                                    supertip='Discard all cached query results, then re-run every CubeConnector formula from scratch.' />
+                        </menu>
+                    </splitButton>
                     <toggleButton id='AutoRefreshToggle'
                             label='Auto-refresh'
                             onAction='OnAutoRefreshToggled'
@@ -58,10 +68,7 @@ namespace CubeConnector
                             label='Manage Formulas'
                             onAction='OnManageFormulasClicked'
                             imageMso='TableInsertDialog' />
-                    <button id='ClearCacheBtn'
-                            label='Clear Cache'
-                            onAction='OnClearCacheClicked'
-                            imageMso='RecordsDeleteRecord' />
+                    <!-- Clear Cache now lives in the Refresh split-button dropdown (OnClearCacheClicked). -->
                     <!-- Drill to Pivot temporarily removed pending further testing.
                          Restore a <button id='DrillToPivotBtn' label='Drill to Pivot'
                          onAction='OnDrillToPivotClicked' imageMso='PivotTableInsert' /> here
