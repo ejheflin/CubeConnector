@@ -16,27 +16,30 @@ namespace CubeConnector
 
         public string GetAccount()
         {
-            try {
-                string token = PowerBiAuth.GetAccessToken(out string src, out string err);
-                if (token == null) return J.Serialize(new { error = err ?? "sign-in failed" });
-                return Ok(new { upn = PowerBiAuth.GetUpnFromToken(token), mode = PowerBiAuth.AccountMode, source = src });
-            } catch (Exception e) { return Err(e); }
+            try { AuthCoordinator.EnsureSignedIn(); return Ok(AuthCoordinator.Snapshot()); }
+            catch (Exception e) { return Err(e); }
+        }
+
+        public string GetAuthState()
+        {
+            try { return Ok(AuthCoordinator.Snapshot()); } catch (Exception e) { return Err(e); }
+        }
+
+        public string CancelSignIn()
+        {
+            try { AuthCoordinator.Cancel(); return Ok(AuthCoordinator.Snapshot()); } catch (Exception e) { return Err(e); }
         }
 
         public string SignInDifferent()
         {
-            try {
-                PowerBiAuth.PrepareDifferentAccount();
-                string t = PowerBiAuth.AcquireToken(true, System.Threading.CancellationToken.None, out _, out string err);
-                if (t == null) return J.Serialize(new { error = err });
-                ClearCaches();
-                return Ok(new { upn = PowerBiAuth.GetUpnFromToken(t) });
-            } catch (Exception e) { return Err(e); }
+            try { AuthCoordinator.SignInDifferent(); ClearCaches(); return Ok(AuthCoordinator.Snapshot()); }
+            catch (Exception e) { return Err(e); }
         }
 
         public string UseWindowsAccount()
         {
-            try { PowerBiAuth.PrepareWindowsAccount(); ClearCaches(); return GetAccount(); } catch (Exception e) { return Err(e); }
+            try { AuthCoordinator.UseWindowsAccount(); ClearCaches(); return Ok(AuthCoordinator.Snapshot()); }
+            catch (Exception e) { return Err(e); }
         }
 
         // Identity changed -> the cached dataset list and model metadata are for the old account.
@@ -50,8 +53,8 @@ namespace CubeConnector
         public string ListDatasets()
         {
             try {
-                string token = PowerBiAuth.GetAccessToken(out _, out string err);
-                if (token == null) return J.Serialize(new { error = err ?? "sign-in failed" });
+                string token = AuthCoordinator.TokenIfReady();
+                if (token == null) { AuthCoordinator.EnsureSignedIn(); return Ok(new { needAuth = true }); }
                 var ds = PowerBiRestClient.GetAllDatasetsCached(token)
                     .Select(d => new { d.Id, d.Name, d.WorkspaceId, d.WorkspaceName, d.IsRefreshable }).ToList();
                 return Ok(new { datasets = ds });
@@ -72,8 +75,8 @@ namespace CubeConnector
                 ModelMetadata md;
                 if (!_modelCache.TryGetValue(datasetId ?? "", out md))
                 {
-                    string token = PowerBiAuth.GetAccessToken(out _, out string err);
-                    if (token == null) return J.Serialize(new { error = err ?? "sign-in failed" });
+                    string token = AuthCoordinator.TokenIfReady();
+                    if (token == null) { AuthCoordinator.EnsureSignedIn(); return Ok(new { needAuth = true }); }
                     try { md = PowerBiRestClient.ExecuteQueriesIntrospect(token, groupId, datasetId); }
                     catch {
                         // Fallback: MSOLAP via ModelIntrospector (may prompt once).
@@ -101,8 +104,8 @@ namespace CubeConnector
                 string key = (datasetId ?? "") + "|" + (table ?? "") + "|" + (column ?? "");
                 if (!_sampleCache.TryGetValue(key, out string val))
                 {
-                    string token = PowerBiAuth.GetAccessToken(out _, out string err);
-                    if (token == null) return J.Serialize(new { error = err ?? "sign-in failed" });
+                    string token = AuthCoordinator.TokenIfReady();
+                    if (token == null) { AuthCoordinator.EnsureSignedIn(); return Ok(new { needAuth = true }); }
                     val = PowerBiRestClient.GetSampleValue(token, groupId, datasetId, table, column);
                     _sampleCache[key] = val;   // cache null/blank too (don't re-query)
                 }
