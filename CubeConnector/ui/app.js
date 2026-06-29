@@ -10,10 +10,10 @@ function $(id){ return document.getElementById(id); }
 
 /* ---------- searchable combobox ---------- */
 function Combo(mount, opts){
-  let items = [], value = null, activeIdx = -1, collapsed = new Set(), loading = false;
+  let items = [], value = null, activeIdx = -1, collapsed = new Set(), loading = false, curLabel = null;
   const root = document.createElement('div'); root.className = 'combo';
   root.innerHTML =
-    `<div class="combo-trigger field" tabindex="0"><span class="val placeholder"></span><span class="chev">▾</span></div>
+    `<div class="combo-trigger field" tabindex="0"><span class="val placeholder"></span><span class="combo-spin" aria-hidden="true"></span><span class="chev">▾</span></div>
      <div class="combo-pop"><input class="combo-search" type="text"><div class="combo-options"></div></div>`;
   mount.innerHTML = ''; mount.appendChild(root);
   const trigger = root.querySelector('.combo-trigger'),
@@ -68,12 +68,14 @@ function Combo(mount, opts){
       });
     } else list.forEach(it=>optsEl.appendChild(optEl(it)));
   }
-  function setLabel(label){ if(label){ valEl.textContent=label; valEl.classList.remove('placeholder'); } else { valEl.textContent=opts.placeholder||'Select…'; valEl.classList.add('placeholder'); } }
+  function setLabel(label){ curLabel = label; if(label){ valEl.textContent=label; valEl.classList.remove('placeholder'); } else { valEl.textContent=opts.placeholder||'Select…'; valEl.classList.add('placeholder'); } }
   function choose(it, fromUser){ value = it.value; setLabel(it.label); if(fromUser && opts.onSelect) opts.onSelect(it.value, it); }
 
   return {
-    setItems(list){ items = list || []; loading = false; if(opts.defaultCollapsed) collapsed = new Set(items.map(i=>i.group||'')); if(root.classList.contains('open')) render(search.value); },
-    setLoading(v){ loading = !!v; if(root.classList.contains('open')) render(search.value); },
+    setItems(list){ items = list || []; loading = false; root.classList.remove('loading'); setLabel(curLabel); if(opts.defaultCollapsed) collapsed = new Set(items.map(i=>i.group||'')); if(root.classList.contains('open')) render(search.value); },
+    setLoading(v){ loading = !!v; root.classList.toggle('loading', loading);
+      if(loading){ valEl.textContent='Loading…'; valEl.classList.remove('placeholder'); } else { setLabel(curLabel); }
+      if(root.classList.contains('open')) render(search.value); },
     getValue(){ return value; },
     setValueLabel(v, label){ value = v; setLabel(label); },
     selectByValue(v){ const it = items.find(x=>x.value===v); if(it){ choose(it, false); return it; } return null; },

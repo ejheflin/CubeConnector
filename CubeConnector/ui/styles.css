@@ -146,6 +146,10 @@ h2.title { font-size: 17px; font-weight: 650; letter-spacing: -.02em; margin-bot
 .combo-trigger .val { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .combo-trigger .val.placeholder { color: var(--faint); }
 .combo-trigger .chev { color: var(--faint); flex: none; }
+.combo-spin { display: none; width: 13px; height: 13px; flex: none; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: cc-spin .7s linear infinite; }
+.combo.loading .combo-spin { display: inline-block; }
+.combo.loading .chev { display: none; }
+@keyframes cc-spin { to { transform: rotate(360deg); } }
 .combo.open .combo-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .combo-pop {
   position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px);
