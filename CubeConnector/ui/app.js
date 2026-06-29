@@ -119,8 +119,29 @@ async function boot(){
 }
 
 async function switchAccount(){
-  try { const a = await call(cc.SignInDifferent()); renderAccount(a); pollAuth(); showStatus('Signing in… pick a model once connected.'); }
-  catch(e){ showStatus('Sign-in failed: ' + e.message); }
+  try {
+    const a = await call(cc.SignInDifferent());
+    renderAccount(a); pollAuth();
+    resetBuilderForTenantSwitch();
+    showStatus('Signing in… pick your data once connected.');
+  } catch(e){ showStatus('Sign-in failed: ' + e.message); }
+}
+
+// Switching tenants invalidates the previously-loaded model/measure/filters (they're
+// tenant-specific). Clear them and, if the builder is open, reload the dataset list for the new
+// tenant. The formula name is kept. Server caches were already cleared by SignInDifferent.
+function resetBuilderForTenantSwitch(){
+  MODEL = { measures:[], columns:[] };
+  if(modelCombo) modelCombo.clear();
+  if(measureCombo) measureCombo.clear();
+  if(CURRENT){
+    CURRENT.DatasetId=''; CURRENT._group=''; CURRENT.ModelName=''; CURRENT.MeasureName='';
+    CURRENT.Parameters=[];
+  }
+  if($('editorView').style.display !== 'none'){   // builder is visible — reload from the new tenant
+    renderFilters(); renderPreview();
+    modelCombo.setLoading(true); loadModels();
+  }
 }
 
 /* ---------- library ---------- */
