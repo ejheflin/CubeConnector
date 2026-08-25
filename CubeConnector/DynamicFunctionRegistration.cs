@@ -82,12 +82,14 @@ namespace CubeConnector
             ConfigurationStore.Invalidate();
             var configs = ConfigurationStore.GetAllConfigs() ?? new System.Collections.Generic.List<UDFConfig>();
 
-            // Excel-DNA can register NEW functions at runtime, but only from a macro context
-            // (xlfRegister), and it cannot unregister or change the arity of one already
-            // registered. So: register only the new ones (via QueueAsMacro); a removal or an
-            // arity change requires a restart. A same-arity edit needs nothing here — the
-            // delegate reads fresh config at call time and we already invalidated the cache.
-            var newConfigs = new System.Collections.Generic.List<UDFConfig>();
+            // Excel-DNA can register functions at runtime from a macro context (xlfRegister),
+            // including re-registering an existing name with a NEW signature — the newest
+            // registration wins for new/recalculated calls. (Each registration permanently
+            // takes one of ~10,000 slots, so per-edit re-registration is fine at this scale.)
+            // What it cannot do is REMOVE a name: deletions linger until restart. A same-arity
+            // edit needs nothing here — the delegate reads fresh config at call time and we
+            // already invalidated the cache.
+            var toRegister = new System.Collections.Generic.List<UDFConfig>();
             var currentNames = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
             bool needRestart = false;
 
@@ -95,16 +97,14 @@ namespace CubeConnector
             {
                 currentNames.Add(c.FunctionName);
                 int arity = c.Parameters?.Count ?? 0;
-                if (!_registeredArity.TryGetValue(c.FunctionName, out int prevArity))
-                    newConfigs.Add(c);                 // brand new -> register live
-                else if (prevArity != arity)
-                    needRestart = true;                // arity changed -> old signature lingers until restart
+                if (!_registeredArity.TryGetValue(c.FunctionName, out int prevArity) || prevArity != arity)
+                    toRegister.Add(c);                 // brand new, or arity changed -> (re-)register live
             }
             foreach (var prev in _registeredArity.Keys)
                 if (!currentNames.Contains(prev)) { needRestart = true; break; }  // removed -> lingers until restart
 
-            if (newConfigs.Count > 0)
-                ExcelAsyncUtil.QueueAsMacro(() => RegisterFunctionsFromConfig(newConfigs));
+            if (toRegister.Count > 0)
+                ExcelAsyncUtil.QueueAsMacro(() => RegisterFunctionsFromConfig(toRegister));
 
             _registeredArity.Clear();
             foreach (var c in configs) _registeredArity[c.FunctionName] = c.Parameters?.Count ?? 0;
