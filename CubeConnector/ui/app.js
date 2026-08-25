@@ -277,6 +277,7 @@ async function fetchSample(i){
     const r = await call(cc.GetSampleValue(CURRENT.DatasetId, CURRENT._group||'', p.TableName, p.FieldName));
     if(p._sampleKey !== key) return;            // field changed since we asked — ignore stale result
     if(r.needAuth){ onReadyRetry(()=>fetchSample(i)); return; }   // retry once signed in
+    if(r.pending){ setTimeout(()=>{ if(p._sampleKey===key) fetchSample(i); }, 350); return; }  // fetch runs in background
     p._sample = (r.value===undefined || r.value===null) ? null : String(r.value);
   } catch(e){ if(p._sampleKey===key) p._sample = null; }
   renderFilters(); renderPreview();

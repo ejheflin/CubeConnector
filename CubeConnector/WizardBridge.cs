@@ -47,7 +47,7 @@ namespace CubeConnector
         {
             PowerBiRestClient.ClearCache();
             _modelCache.Clear();
-            _sampleCache.Clear();
+            lock (_sampleLock) _sampleCache.Clear();
         }
 
         public string ListDatasets()
@@ -66,8 +66,12 @@ namespace CubeConnector
             new Dictionary<string, ModelMetadata>(StringComparer.OrdinalIgnoreCase);
 
         // Per-column example-value cache (key: datasetId|table|column). Null/blank is cached too.
+        // Sample fetches complete on background tasks; _sampleLock guards cache + in-flight set.
         private static readonly Dictionary<string, string> _sampleCache =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> _samplePending =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object _sampleLock = new object();
 
         public string GetModel(string datasetId, string groupId)
         {
@@ -102,14 +106,25 @@ namespace CubeConnector
             try
             {
                 string key = (datasetId ?? "") + "|" + (table ?? "") + "|" + (column ?? "");
-                if (!_sampleCache.TryGetValue(key, out string val))
+                lock (_sampleLock)
                 {
+                    if (_sampleCache.TryGetValue(key, out string val)) return Ok(new { value = val });
                     string token = AuthCoordinator.TokenIfReady();
                     if (token == null) { AuthCoordinator.EnsureSignedIn(); return Ok(new { needAuth = true }); }
-                    val = PowerBiRestClient.GetSampleValue(token, groupId, datasetId, table, column);
-                    _sampleCache[key] = val;   // cache null/blank too (don't re-query)
+                    // Fetch off the bridge thread: a blocking REST call here queues every later
+                    // bridge call (e.g. Save) behind it. Return pending; the UI polls back.
+                    if (_samplePending.Add(key))
+                    {
+                        System.Threading.Tasks.Task.Run(() =>
+                        {
+                            string v = null;
+                            try { v = PowerBiRestClient.GetSampleValue(token, groupId, datasetId, table, column); }
+                            catch { }   // cache the miss too (don't re-query a failing column)
+                            lock (_sampleLock) { _sampleCache[key] = v; _samplePending.Remove(key); }
+                        });
+                    }
+                    return Ok(new { pending = true });
                 }
-                return Ok(new { value = val });
             }
             catch (Exception e) { return Err(e); }
         }
