@@ -260,11 +260,13 @@ function setField(i,v){ const [t,f,dt]=v.split('||'); const p=CURRENT.Parameters
   p.DataType=mapType(dt); if(!p.Name) p.Name=suggestName(f, p._kind); fetchSample(i); renderFilters(); renderPreview(); }
 
 function truncate(s,n){ s=String(s); return s.length>n ? s.slice(0,n)+'…' : s; }
+// Display-only: date samples show without the time part; real arguments still accept full datetimes.
+function displaySample(p){ let s=String(p._sample); if(p.DataType==='date') s=s.replace(/[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/,''); return s; }
 // Inline "e.g. <value>" hint for a filter's chosen field. '' = nothing, '…' = loading.
 function sampleHint(p){
   if(!p.FieldName) return '';
   if(p._sample===undefined) return '<span class="sample">…</span>';
-  if(typeof p._sample==='string' && p._sample!=='') return '<span class="sample">e.g. '+esc(truncate(p._sample,40))+'</span>';
+  if(typeof p._sample==='string' && p._sample!=='') return '<span class="sample">e.g. '+esc(truncate(displaySample(p),40))+'</span>';
   return '';
 }
 // Fetch one example value for the field at index i (async, cached server-side, stale-guarded).
@@ -343,7 +345,7 @@ function renderPreview(){
     names.map(n=>`<span class="arg">${esc(n)}</span>`).join(', ') + ')';
   $('explain').innerHTML = `Returns <b>${esc(measure)}</b>` + (names.length? `, filtered by ${esc(names.join(', '))}.` : '.');
   const ex = CURRENT.Parameters.map(p => {
-    const s = (typeof p._sample==='string' && p._sample!=='') ? p._sample : null;
+    const s = (typeof p._sample==='string' && p._sample!=='') ? displaySample(p) : null;
     if(s !== null) return p.DataType==='number' ? esc(s) : '"'+esc(s)+'"';
     return p.DataType==='date' ? '"1/1/2025"' : p.DataType==='number' ? '"4000"' : '"East"';
   });
