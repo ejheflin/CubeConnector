@@ -150,6 +150,7 @@ h2.title { font-size: 17px; font-weight: 650; letter-spacing: -.02em; margin-bot
 .combo.loading .combo-spin { display: inline-block; }
 .combo.loading .chev { display: none; }
 @keyframes cc-spin { to { transform: rotate(360deg); } }
+.btn-spin { display: inline-block; width: 13px; height: 13px; vertical-align: -2px; margin-right: 7px; border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: cc-spin .7s linear infinite; }
 .combo.open .combo-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .combo-pop {
   position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px);

@@ -376,12 +376,17 @@ async function saveFunction(){
   if(isReserved(fnName)){ showStatus('“'+fnName+'” is a built-in Excel function — please choose a different name.'); return; }
   const dto = { FunctionName:fnName, MeasureName:'['+measure+']',
     DatasetId:CURRENT.DatasetId, TenantId:'', ModelName:CURRENT.ModelName||'', Parameters:params };
+  const btn = $('btnSave');
+  btn.disabled = true; btn.innerHTML = '<span class="btn-spin"></span>Saving…';
   try {
     await call(cc.SaveFunction(JSON.stringify(dto)));
     await refreshLibrary(); showLibrary();
-    try { await call(cc.ReloadFunctions()); showStatus('✓ Saved — your formula is ready to use in Excel.'); }
-    catch(e){ showStatus('Saved. Reload into Excel failed: ' + e.message); }
+    try { const r = await call(cc.ReloadFunctions());
+      if(r.removedNeedRestart) $('restart').style.display='block';
+      showStatus('✓ Saved — your formula is ready to use in Excel.');
+    } catch(e){ showStatus('Saved. Reload into Excel failed: ' + e.message); }
   } catch(e){ showStatus('Save failed: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Save formula'; }
 }
 
 async function editFunction(name){
